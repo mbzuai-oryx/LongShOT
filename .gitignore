@@ -1,0 +1,8 @@
+*__MACOSX*
+# notes.txt
+tmp/
+*__pycache__*
+*logs*
+preprocess/dataset/*
+datagen/results/*
+eval/results_*

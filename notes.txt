@@ -1,0 +1,48 @@
+# Installation
+conda create -n longshot python=3.11 -y
+conda activate longshot
+pip install -r requirements.txt
+
+# Preprocess (download and process video, audio, speech metadata/transcriptions)
+cd preprocess
+
+# get youtube cookies and download videos
+- install extension to get cookies | go to : https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc
+- add extension > youtube > refresh > open extension, copy > paste in preprocess/cookies.txt
+
+python download_youtube_videos.py # please manualy download any video that is not downloadable theoug this script
+# conda install -c conda-forge cudnn=8 # if cudnn issue
+
+# run vllm vlm server on a different terminal
+./vllm_start.sh vlm
+python run.py vlm-stages
+
+# run vllm llm server on a different terminal
+./vllm_start.sh llm
+python run.py llm-stages
+
+# Raw dataset with video/audio/speech descripyions is ready nUOVF6rgNsw
+
+# Genarate data
+cd ../datagen
+python main.py
+
+# final dataset will be saved at;
+datagen/results/final_dataset.jsonl
+
+# upload hf
+[add a dummy code section for this]
+
+# Evaluations
+cd ../eval
+bash generate.sh # to geenrate responses from candidate model
+bash eval.sh # to evaluate candidate responses
+
+TO DO
+> remove unwanted codes/comments
+> readme individual and full
+> remove hallucination?
+> add repo in abstract
+> remove ui related elements in preprocess/run.py
+> clean arabic in preprocess/run.py
+> clean_dataset.jsonl?
