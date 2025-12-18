@@ -34,7 +34,7 @@
 LongShOT introduces a diagnostic benchmark and agentic framework for long-form multimodal video understanding. **LongShOTBench** features open-ended questions, multi-turn dialogues, and tasks requiring vision, speech, and audio reasoning with tool use. Each sample includes reference answers and graded rubrics for interpretable evaluation. **LongShOTAgent** employs preprocessing, search, and iterative refinement to analyze long videos. Current state-of-the-art models show significant gaps: Gemini-2.5-Flash achieves 52.95%, open-source models remain below 30%, and LongShOTAgent attains 44.66%, highlighting the challenge of real-world long video understanding.
 
 <p align="center">
-    <img src="figures/generation_pipeline_overview.pdf" alt="Generation Pipeline">
+    <img src="figures/generation_pipeline_overview.png" alt="Generation Pipeline">
 </p>
 
 **Figure 1:** Construction pipeline of LongShOTBench. The pipeline begins with raw video data where speech, visuals, and audio cues are extracted. These are passed into multimodal processing to generate segment-wise aligned and fused metadata. Only the distilled information flows to question design, where scenarios and question types are mapped, followed by the generation of questions and conversational answers. Next, verifiable rubrics are created to evaluate correctness and difficulty. Finally, the core dataset, comprising Q&A pairs and tailored evaluation rubrics, is manually reviewed and corrected by human validators, ensuring a clean, reliable benchmark.
