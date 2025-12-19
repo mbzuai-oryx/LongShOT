@@ -1,0 +1,181 @@
+You are generating questions that a real person would naturally ask after watching a video. Think like someone who watched the video and is genuinely curious about what they observed.
+
+CORE PRINCIPLE: HUMAN CURIOSITY
+Generate questions that reflect natural human interest and curiosity about what happened in the video. These should be the kinds of questions people actually ask when discussing videos they've watched.
+
+INPUTS
+- Video Metadata: {video_metadata} (what was seen, heard, and said)
+- Scenario: {scenario} (context for viewing the video)  
+- Expected Question Types: {enriched_question_types} (guidance on question styles)
+
+WHAT REAL PEOPLE ASK ABOUT
+Focus on questions people naturally have when watching videos:
+
+**What happened and why?**
+- "What was the person trying to do when they..."
+- "Why did they decide to..."
+- "What caused them to change their approach?"
+
+**How things worked or were done**
+- "How did they manage to..."
+- "What technique did they use to..."
+- "How did they solve the problem when..."
+
+**Understanding the situation**
+- "What was going on when..."
+- "Who was involved in..."
+- "What was the point of..."
+
+**Outcomes and consequences**
+- "What happened as a result of..."
+- "How did it turn out when they..."
+- "What was the final outcome..."
+
+**Meaning and purpose**
+- "What was the main message about..."
+- "What were they trying to demonstrate..."
+- "What lesson was being taught..."
+
+MULTIMODAL INTEGRATION REQUIREMENTS
+As difficulty increases, questions should naturally require multiple modalities:
+
+**Difficulty 1-2**: May focus on single modality (visual OR audio OR speech)
+**Difficulty 3-5**: Must integrate multiple modalities naturally, such as:
+- Questions where spoken instructions relate to visual actions
+- Understanding reactions (visual) to what was said (speech)  
+- How background sounds (audio) affected what people did (visual)
+- Connecting what someone explained (speech) with what they demonstrated (visual)
+- How tone of voice (audio) revealed feelings about what was happening (visual)
+
+**CRITICAL: Only connect modalities when there's a REAL relationship**
+- Don't force connections between unrelated simultaneous events
+- Just because audio and visual happen at the same time doesn't mean they're related
+- For compilation videos, different segments are usually unrelated - don't connect them
+
+AVOID ARTIFICIAL QUESTIONS
+Do NOT create questions that:
+- Sound like test questions or academic exercises
+- Use overly technical language or jargon ("synchronization", "visual cues", "audio-visual alignment")
+- Focus on minute details that don't matter to the story
+- Ask about production aspects (camera work, editing, etc.)
+- Require precise timing or measurements unless naturally relevant
+- Force unnatural combinations just to be "multimodal"
+- Try to find deep meaning in random coincidences
+- Connect unrelated events just because they happen simultaneously
+- Use film analysis language ("visual metaphor", "symbolic representation")
+
+**THE COMMON SENSE TEST**: Would a normal person watching this video with friends actually ask this question? If not, don't generate it.  
+
+NATURAL CONVERSATION PATTERNS
+Think about how people discuss videos in real conversations:
+
+**Simple curiosity (most common)**
+- Direct questions about what they saw happen
+- Questions about motivations and reasons
+- Questions about outcomes and results
+
+**Follow-up questions (natural flow)**
+- Building on previous answers to go deeper
+- Asking for clarification or more detail
+- Connecting different parts of the video
+
+**Conversational roles in multi-turn:**
+- **Opener**: Initial curiosity about something interesting
+- **Deepener**: Wants to understand more about what was just discussed  
+- **Challenger**: Questions or probes an assumption or claim
+- **Synthesizer**: Tries to put pieces together or see the bigger picture
+
+QUESTION GENERATION REQUIREMENTS
+- Generate **1 single questions** that someone might ask after watching
+- Generate **1 conversation sets** (2-3 questions each) that flow naturally
+- Use conversational language, not formal or academic tone
+- **CRITICAL: Ground questions in what actually happened in the video metadata**
+- **CRITICAL: Only reference entities, people, products, or events that exist in the video**
+- **CRITICAL: Don't create questions about fabricated elements not in the metadata**
+- **CRITICAL: Don't create similar questions in both single-turn questions and multi-turn conversations**
+- Make sure questions require watching the video to answer
+
+DIFFICULTY SCALE (1-5, keep natural)
+- **1**: Simple "what happened" questions about obvious actions (single modality OK)
+- **2**: Basic "why" or "how" questions about single events (single modality OK)
+- **3**: Questions requiring context or relationships (should use 2+ modalities naturally)
+- **4**: Questions connecting multiple events or requiring reasoning (must use 2+ modalities)
+- **5**: Questions about deeper meaning, lessons, or complex patterns (must use 2+ modalities)
+
+**IMPORTANT**: If the video content doesn't naturally support higher difficulty multimodal questions, it's better to generate more difficulty 1-2 questions than to force artificial complexity.
+
+TIMESTAMP USAGE
+- Use actual time references from the video metadata, not segment numbers
+- Example: "What happened around the 2-minute mark?" instead of "What happened in segment 4?"
+- Only reference specific times when the timing is actually important to the question
+- Most questions should be timeless - about events that happened without needing precise timing
+
+OUTPUT FORMAT
+Valid JSON only:
+
+{
+  "single_turn_questions": [
+    {
+      "question": "What was the person trying to accomplish when they started mixing those ingredients?",
+      "difficulty": 2,
+      "modalities": ["visual", "speech"],
+      "key_segments": [0, 2, 5]
+    }
+  ],
+  "multi_turn_questions": [
+    [
+      {
+        "question": "What went wrong with their first attempt?",
+        "difficulty": 2,
+        "conversation_role": "opener",
+        "modalities": ["visual"],
+        "key_segments": [1, 3]
+      },
+      {
+        "question": "How did they figure out how to fix it?",
+        "difficulty": 3,
+        "conversation_role": "deepener", 
+        "modalities": ["visual", "speech"],
+        "key_segments": [4, 6]
+      }
+    ]
+  ]
+}
+
+GOOD vs BAD EXAMPLES
+
+**Examples of BAD artificial questions to NEVER generate:**
+- "What specific action does the presenter perform while confirming the heavy thundery downpours?" → Over-specific, nobody would ask this
+- "How does the visual detail of balloons relate to the audio's layered musical arrangement?" → Forced connection of unrelated elements
+- "What does the synchronization between ripple effects and musical cues reveal?" → Academic film analysis language
+- "Why does the gesture coincide with the rhythmic beat intensifying?" → Random timing correlation
+- "How does the static cityscape reflect this resolution?" → Connecting unrelated background visuals to speech
+
+**Examples of GOOD natural questions:**
+- "What was the weather forecast for the southwest region?" (speech/visual - actual content people care about)
+- "How did the kids react when the balloons fell in the pool?" (visual - genuine human interest)
+- "What did the coach tell them to do differently?" (speech - practical question)
+- "Why did the person look frustrated after trying that?" (visual + context - real human curiosity)
+- "What was the main point they were trying to make?" (speech/visual - natural question about meaning)
+
+FINAL GUIDELINES
+- Use natural, conversational language that sounds like real people talking
+- Ask questions people would actually want to know the answer to
+- Focus on the story and content, not technical or production details
+- Make questions that need the full video context to answer
+- Keep genuine human curiosity at the center
+- **NEVER mention "segment X" or technical identifiers in questions**
+- Use actual timestamps only when timing matters (e.g., "around 3:15" not "segment 7")
+- **Always assign difficulty 1-5** based on how much thinking the question requires
+- **For difficulty 3-5: naturally integrate multiple modalities** - but only when they're actually related
+- **Apply the friend test**: Would you ask this question if watching the video with a friend? If no, don't generate it
+- **Don't force complexity**: Better to have good simple questions than bad complex ones
+- **Avoid coincidence questions**: Don't connect things just because they happen at the same time
+
+**ABSOLUTE REQUIREMENTS FOR ACCURACY:**
+- **Before generating questions, carefully scan the video metadata to identify what's actually there**
+- **Only ask about products, people, or events mentioned in the speech or visual descriptions**
+- **Don't assume details not explicitly stated** - stick to what's clearly present
+- **Be specific but accurate** - reference actual quotes, actions, or elements from the metadata
+- **Double-check: Does every entity referenced in your questions exist in the metadata?**
+- **Avoid generic questions that could apply to any video** - ground them in specific content  

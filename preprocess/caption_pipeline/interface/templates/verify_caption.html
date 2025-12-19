@@ -1,0 +1,902 @@
+{% extends 'base.html' %}
+
+{% block title %}Verify Captions - {{ video.title }} - Arabic Video Dataset{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Video Column -->
+        <div class="col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Video Player</h4>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="loop-toggle" checked>
+                            <label class="form-check-label text-light" for="loop-toggle">Loop Segment</label>
+                        </div>
+                        <div id="verification-timer" class="badge bg-light text-dark">00:00:00</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="ratio ratio-16x9 mb-3">
+                        <video id="video-player" controls class="rounded shadow-sm"
+                               data-segment-start="{{ segment.start_time }}"
+                               data-segment-end="{{ segment.end_time }}">
+                            <source src="{{ url_for('main.video_file', video_id=video.video_id) }}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    
+                    <!-- Enhanced Video Controls -->
+                    <div class="video-controls responsive-controls d-flex flex-wrap gap-2 mb-3">
+                        <div class="btn-group">
+                            <button id="play-segment-btn" class="btn btn-primary" title="Play segment (Space)">
+                                <i class="fas fa-play"></i> Play Segment
+                            </button>
+                            <button id="replay-segment-btn" class="btn btn-secondary" title="Replay last 3s (R)">
+                                <i class="fas fa-redo"></i> Replay 3s
+                            </button>
+                        </div>
+                        
+                        <!-- Playback Speed Control -->
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                <i class="fas fa-tachometer-alt"></i> Speed <span id="current-speed">1x</span>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><button class="dropdown-item playback-speed" data-speed="0.5">0.5x</button></li>
+                                <li><button class="dropdown-item playback-speed" data-speed="0.75">0.75x</button></li>
+                                <li><button class="dropdown-item playback-speed" data-speed="1.0">1x</button></li>
+                                <li><button class="dropdown-item playback-speed" data-speed="1.25">1.25x</button></li>
+                                <li><button class="dropdown-item playback-speed" data-speed="1.5">1.5x</button></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar and Navigation -->
+                    <div class="verification-progress mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <small class="text-muted">Progress: {{ "%.1f"|format(verification_progress) }}% complete</small>
+                            <small class="text-muted">Segment {{ segment_index + 1 }} of {{ total_segments }}</small>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: {{ verification_progress }}%"
+                                 aria-valuenow="{{ verification_progress }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1 mb-2">
+                            <small class="text-muted">{{ verified_segments }} of {{ total_segments }} segments verified</small>
+                            <small class="text-muted">
+                                <span class="badge bg-success">{{ approved_segments }}</span> approved, 
+                                <span class="badge bg-info">{{ edited_segments }}</span> edited
+                            </small>
+                        </div>
+                        <div class="segment-timeline mt-2">
+                            <div class="d-flex gap-1 overflow-auto pb-2">
+                                {% for i in range(total_segments) %}
+                                <button class="btn btn-sm {% if i == segment_index %}btn-primary{% elif segments_status[i] == 'approved' %}btn-success{% elif segments_status[i] == 'edited' %}btn-info{% else %}btn-outline-secondary{% endif %} segment-jump"
+                                        style="min-width: 35px" 
+                                        data-segment="{{ i }}"
+                                        title="Segment {{ i + 1 }} {% if segments_status[i] in ['approved', 'edited'] %}({{ segments_status[i]|title }}){% endif %}">
+                                    {{ i + 1 }}
+                                </button>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Keyboard Shortcuts Guide -->
+                    <div class="alert alert-light mb-0">
+                        <h6 class="mb-2"><i class="fas fa-keyboard me-2"></i>Keyboard Shortcuts</h6>
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <small class="d-block">
+                                    <kbd>Space</kbd> Play/Pause
+                                </small>
+                                <small class="d-block">
+                                    <kbd>R</kbd> Replay Last 3s
+                                </small>
+                            </div>
+                            <div class="col-sm-6">
+                                <small class="d-block">
+                                    <kbd>←</kbd>/<kbd>→</kbd> Previous/Next Segment
+                                </small>
+                                <small class="d-block">
+                                    <kbd>Ctrl</kbd>+<kbd>Enter</kbd> Approve Segment
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status Card -->
+            <div class="card shadow">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Current Caption</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <div>
+                            <h6 class="mb-1">Status</h6>
+                            <span class="badge {% if segment.verification_status == 'pending' %}bg-warning{% elif segment.verification_status == 'approved' %}bg-success{% else %}bg-info{% endif %}">
+                                {% if segment.verification_status == 'pending' %}Needs Review{% elif segment.verification_status == 'approved' %}Approved{% else %}{{ segment.verification_status|title }}{% endif %}
+                            </span>
+                        </div>
+                        <div>
+                            <h6 class="mb-1">Time in Video</h6>
+                            <span class="text-muted">{{ "%.1f"|format(segment.start_time) }}s - {{ "%.1f"|format(segment.end_time) }}s</span>
+                        </div>
+                        <div>
+                            <h6 class="mb-1">Length</h6>
+                            <span class="text-muted">{{ "%.1f"|format(segment.end_time - segment.start_time) }}s</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Caption Editor Column -->
+        <div class="col-lg-6">
+            <div class="card shadow h-100">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="mb-0">Caption Text</h4>
+                        <small class="text-white-50">Check if the text matches what you hear</small>
+                    </div>
+                </div>
+
+                <div class="card-body d-flex flex-column caption-editor-container">
+                    <form id="segment-form" class="caption-form">
+                        <div class="mb-3">
+                            <div class="alert alert-light">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-robot text-primary me-2"></i>
+                                    <h6 class="mb-0">Computer-Generated Text</h6>
+                                </div>
+                                <div class="p-2 bg-light rounded" dir="rtl">
+                                    {{ segment.original_text }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="caption-textarea-container">
+                            <label for="caption-text" class="form-label">
+                                <i class="fas fa-edit me-1"></i> Corrected Text
+                                <small class="text-muted ms-2">Fix any mistakes you notice</small>
+                            </label>
+                            <textarea id="caption-text" 
+                                    class="form-control form-control-lg auto-expand-textarea" 
+                                    style="resize: none; overflow: hidden;"
+                                    dir="rtl"
+                                    placeholder="Type the correct Arabic text here..."
+                                    data-auto-expand="true">{{ segment.verified_text or segment.original_text }}</textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-2 mt-3">
+                            <div class="btn-group flex-grow-1">
+                                <button type="button" id="approve-btn" class="btn btn-success" title="Text is correct (Ctrl+Enter)">
+                                    <i class="fas fa-check me-1"></i> Text is Correct
+                                </button>
+                                <button type="submit" id="save-edit-btn" class="btn btn-primary" title="Save corrections (Ctrl+S)">
+                                    <i class="fas fa-save me-1"></i> Save Changes
+                                </button>
+                                <button type="button" id="skip-btn" class="btn btn-light" title="Skip for now (Tab)">
+                                    Skip for Now <i class="fas fa-forward ms-1"></i>
+                                </button>
+                            </div>
+
+                            <!-- Quick Actions Dropdown -->
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <button type="button" class="dropdown-item" id="adjustTimingBtn">
+                                            <i class="fas fa-clock me-2"></i> Adjust Timing
+                                        </button>
+                                    </li>
+                                    <li>
+                                        <button type="button" class="dropdown-item" id="markAudioIssueBtn">
+                                            <i class="fas fa-microphone-slash me-2"></i> Report Audio Problem
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+{% include 'modals/approval_confirmation_modal.html' %}
+{% include 'modals/audio_issue_modal.html' %}
+{% include 'modals/timing_adjustment_modal.html' %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Simple auto-expand textarea function
+    function autoExpandTextarea(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+    }
+
+    // Setup auto-expanding textarea
+    const captionTextarea = document.getElementById('caption-text');
+    if (captionTextarea) {
+        // Set initial height
+        autoExpandTextarea(captionTextarea);
+        
+        // Add event listeners for auto-expansion
+        captionTextarea.addEventListener('input', () => autoExpandTextarea(captionTextarea));
+        captionTextarea.addEventListener('paste', () => {
+            setTimeout(() => autoExpandTextarea(captionTextarea), 10);
+        });
+    }
+
+    // Video player setup and controls
+    const videoPlayer = document.getElementById('video-player');
+    const playSegmentBtn = document.getElementById('play-segment-btn');
+    const replaySegmentBtn = document.getElementById('replay-segment-btn');
+    let segmentStartTime = parseFloat(videoPlayer.dataset.segmentStart);
+    let segmentEndTime = parseFloat(videoPlayer.dataset.segmentEnd);
+    const loopToggle = document.getElementById('loop-toggle');
+
+    let verificationStartTime = Date.now();
+    let verificationTimer;
+
+    // Initialize video player
+    videoPlayer.addEventListener('loadedmetadata', function() {
+        videoPlayer.currentTime = segmentStartTime;
+    });
+
+    // Video playback functions
+    function playSegment() {
+        videoPlayer.currentTime = segmentStartTime;
+        videoPlayer.play();
+    }
+
+    function replayLastSeconds() {
+        const newTime = Math.max(segmentStartTime, videoPlayer.currentTime - 3);
+        videoPlayer.currentTime = newTime;
+        videoPlayer.play();
+    }
+
+    // Segment loop handling
+    function checkSegmentEnd() {
+        if (videoPlayer.currentTime >= segmentEndTime) {
+            if (loopToggle.checked) {
+                videoPlayer.currentTime = segmentStartTime;
+                videoPlayer.play();
+            } else {
+                videoPlayer.pause();
+            }
+        }
+    }
+
+    // Verification timer
+    function startVerificationTimer() {
+        const timerDisplay = document.getElementById('verification-timer');
+        verificationTimer = setInterval(function() {
+            const elapsedSeconds = Math.floor((Date.now() - verificationStartTime) / 1000);
+            timerDisplay.textContent = formatTime(elapsedSeconds);
+        }, 1000);
+    }
+
+    function formatTime(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    // API Helper Functions
+    function updateSegment(status, text) {
+        const verificationTime = (Date.now() - verificationStartTime) / 1000; // Convert ms to seconds
+        const data = {
+            status: status,
+            verification_time: verificationTime
+        };
+        
+        if (text !== null && text !== undefined) {
+            data.text = text;
+        }
+        
+        return fetch('/api/segments/{{ video.video_id }}/{{ segment_index }}', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(data)
+        });
+    }
+
+    function navigateToSegment(segmentIndex) {
+        window.location.href = '{{ url_for("main.verify_caption", video_id=video.video_id) }}?segment=' + segmentIndex;
+    }
+
+    // Button Event Handlers
+    const approveBtn = document.getElementById('approve-btn');
+    if (approveBtn) {
+        approveBtn.addEventListener('click', function() {
+            const modal = document.getElementById('approval-confirmation-modal');
+            if (modal) {
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+            }
+        });
+    }
+
+    const confirmApproveBtn = document.getElementById('confirm-approve-btn');
+    if (confirmApproveBtn) {
+        confirmApproveBtn.addEventListener('click', function() {
+            updateSegment('approved')
+                .then(function(response) { 
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json(); 
+                })
+                .then(function(data) {
+                    if (data.success) {
+                        if (window.Toast) {
+                            window.Toast.show('Segment approved successfully!', 'success');
+                        }
+                        // Navigate to next segment or completion
+                        setTimeout(function() {
+                            if (data.next_segment !== null) {
+                                navigateToSegment(data.next_segment);
+                            } else {
+                                window.location.href = '{{ url_for("main.video_detail", video_id=video.video_id) }}';
+                            }
+                        }, 1000);
+                    } else {
+                        if (window.Toast) {
+                            window.Toast.show('Error approving segment: ' + (data.error || 'Unknown error'), 'danger');
+                        }
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                    if (window.Toast) {
+                        window.Toast.show('Network error occurred: ' + error.message, 'danger');
+                    }
+                });
+            
+            // Hide modal
+            const modal = document.getElementById('approval-confirmation-modal');
+            if (modal) {
+                const bsModal = bootstrap.Modal.getInstance(modal);
+                if (bsModal) bsModal.hide();
+            }
+        });
+    }
+
+    const saveEditBtn = document.getElementById('save-edit-btn');
+    if (saveEditBtn) {
+        saveEditBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const textArea = document.getElementById('caption-text');
+            const editedText = textArea.value.trim();
+            
+            if (!editedText) {
+                if (window.Toast) {
+                    window.Toast.show('Please enter some text before saving', 'warning');
+                }
+                return;
+            }
+            
+            updateSegment('edited', editedText)
+                .then(function(response) { 
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json(); 
+                })
+                .then(function(data) {
+                    if (data.success) {
+                        if (window.Toast) {
+                            window.Toast.show('Segment updated successfully!', 'success');
+                        }
+                        // Navigate to next segment or completion
+                        setTimeout(function() {
+                            if (data.next_segment !== null) {
+                                navigateToSegment(data.next_segment);
+                            } else {
+                                window.location.href = '{{ url_for("main.video_detail", video_id=video.video_id) }}';
+                            }
+                        }, 1000);
+                    } else {
+                        if (window.Toast) {
+                            window.Toast.show('Error updating segment: ' + (data.error || 'Unknown error'), 'danger');
+                        }
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                    if (window.Toast) {
+                        window.Toast.show('Network error occurred: ' + error.message, 'danger');
+                    }
+                });
+        });
+    }
+
+    const skipBtn = document.getElementById('skip-btn');
+    if (skipBtn) {
+        skipBtn.addEventListener('click', function() {
+            // Navigate to next segment without updating current one
+            const nextSegmentIndex = {{ segment_index + 1 }};
+            if (nextSegmentIndex < {{ total_segments }}) {
+                navigateToSegment(nextSegmentIndex);
+            } else {
+                // If this is the last segment, go back to video detail
+                window.location.href = '{{ url_for("main.video_detail", video_id=video.video_id) }}';
+            }
+        });
+    }
+
+    // Playback speed control
+    document.querySelectorAll('.playback-speed').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const speed = parseFloat(btn.dataset.speed);
+            videoPlayer.playbackRate = speed;
+            document.getElementById('current-speed').textContent = speed + 'x';
+        });
+    });
+
+    // Event Listeners
+    videoPlayer.addEventListener('timeupdate', checkSegmentEnd);
+    if (playSegmentBtn) playSegmentBtn.addEventListener('click', playSegment);
+    if (replaySegmentBtn) replaySegmentBtn.addEventListener('click', replayLastSeconds);
+
+    // Segment navigation
+    document.querySelectorAll('.segment-jump').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const segmentIndex = parseInt(btn.dataset.segment);
+            navigateToSegment(segmentIndex);
+        });
+    });
+
+    // Navigation button handlers
+    const prevSegmentIndex = {{ segment_index - 1 if segment_index > 0 else -1 }};
+    const nextSegmentIndex = {{ segment_index + 1 if segment_index < total_segments - 1 else -1 }};
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (document.activeElement.tagName === 'TEXTAREA') {
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                if (approveBtn) approveBtn.click();
+            }
+            return;
+        }
+        
+        switch (e.key) {
+            case ' ':
+                e.preventDefault();
+                if (videoPlayer.paused) videoPlayer.play();
+                else videoPlayer.pause();
+                break;
+            case 'r':
+            case 'R':
+                e.preventDefault();
+                replayLastSeconds();
+                break;
+            case 'ArrowLeft':
+                if (prevSegmentIndex >= 0) {
+                    navigateToSegment(prevSegmentIndex);
+                }
+                break;
+            case 'ArrowRight':
+                if (nextSegmentIndex >= 0) {
+                    navigateToSegment(nextSegmentIndex);
+                }
+                break;
+            case 'Tab':
+                e.preventDefault();
+                if (skipBtn) skipBtn.click();
+                break;
+        }
+        
+        if (e.ctrlKey) {
+            switch (e.key) {
+                case 's':
+                case 'S':
+                    e.preventDefault();
+                    if (saveEditBtn) saveEditBtn.click();
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    if (approveBtn) approveBtn.click();
+                    break;
+            }
+        }
+    });
+
+    // Initialize verification timer and auto-play
+    startVerificationTimer();
+    setTimeout(playSegment, 1000);
+
+    // Modal functionality for Adjust Timing button
+    const adjustTimingBtn = document.getElementById('adjustTimingBtn');
+    if (adjustTimingBtn) {
+        adjustTimingBtn.addEventListener('click', function() {
+            const modal = document.getElementById('timing-adjustment-modal');
+            if (modal) {
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+            }
+        });
+    }
+
+    // Modal functionality for Report Audio Issue button  
+    const markAudioIssueBtn = document.getElementById('markAudioIssueBtn');
+    if (markAudioIssueBtn) {
+        markAudioIssueBtn.addEventListener('click', function() {
+            const modal = document.getElementById('audio-issue-modal');
+            if (modal) {
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+            }
+        });
+    }
+
+    // Timing adjustment modal functionality
+    const startTimeInput = document.getElementById('start-time');
+    const endTimeInput = document.getElementById('end-time');
+    const segmentDurationSpan = document.getElementById('segment-duration');
+    
+    function updateSegmentDuration() {
+        if (startTimeInput && endTimeInput && segmentDurationSpan) {
+            const start = parseFloat(startTimeInput.value) || 0;
+            const end = parseFloat(endTimeInput.value) || 0;
+            const duration = Math.max(0, end - start);
+            segmentDurationSpan.textContent = duration.toFixed(1);
+        }
+    }
+
+    if (startTimeInput) {
+        startTimeInput.addEventListener('input', updateSegmentDuration);
+    }
+    if (endTimeInput) {
+        endTimeInput.addEventListener('input', updateSegmentDuration);
+    }
+
+    // Set current time buttons
+    document.querySelectorAll('.set-current-time').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const targetInput = document.getElementById(btn.dataset.target);
+            if (targetInput && videoPlayer) {
+                targetInput.value = videoPlayer.currentTime.toFixed(1);
+                updateSegmentDuration();
+            }
+        });
+    });
+
+    // Preview timing button
+    const previewTimingBtn = document.getElementById('preview-timing-btn');
+    if (previewTimingBtn) {
+        previewTimingBtn.addEventListener('click', function() {
+            const startTime = parseFloat(startTimeInput.value) || 0;
+            const endTime = parseFloat(endTimeInput.value) || 0;
+            
+            if (startTime < endTime) {
+                videoPlayer.currentTime = startTime;
+                videoPlayer.play();
+                
+                // Stop at end time
+                const checkEnd = function() {
+                    if (videoPlayer.currentTime >= endTime) {
+                        videoPlayer.pause();
+                        videoPlayer.removeEventListener('timeupdate', checkEnd);
+                    }
+                };
+                videoPlayer.addEventListener('timeupdate', checkEnd);
+            }
+        });
+    }
+
+    // Save timing changes
+    const saveTimingBtn = document.getElementById('save-timing-btn');
+    if (saveTimingBtn) {
+        saveTimingBtn.addEventListener('click', function() {
+            const startTime = parseFloat(startTimeInput.value) || 0;
+            const endTime = parseFloat(endTimeInput.value) || 0;
+            
+            if (startTime >= endTime) {
+                if (window.Toast) {
+                    window.Toast.show('End time must be greater than start time', 'warning');
+                }
+                return;
+            }
+            
+            if (endTime - startTime < 0.5) {
+                if (window.Toast) {
+                    window.Toast.show('Segment must be at least 0.5 seconds long', 'warning');
+                }
+                return;
+            }
+            
+            // Disable button during request
+            saveTimingBtn.disabled = true;
+            saveTimingBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Saving...';
+            
+            const data = {
+                start_time: startTime,
+                end_time: endTime
+            };
+            
+            console.log('Sending timing update:', data);
+            
+            fetch('/api/segments/{{ video.video_id }}/{{ segment_index }}/timing', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(function(response) {
+                console.log('Response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(function(responseData) {
+                console.log('Response data:', responseData);
+                
+                if (responseData.success) {
+                    if (window.Toast) {
+                        window.Toast.show('Timing updated successfully!', 'success');
+                    }
+                    
+                    // Update the video player's segment times immediately
+                    videoPlayer.dataset.segmentStart = startTime;
+                    videoPlayer.dataset.segmentEnd = endTime;
+                    
+                    // Update the global variables
+                    segmentStartTime = startTime;
+                    segmentEndTime = endTime;
+                    
+                    // Update the segment end check function to use new values
+                    function checkSegmentEnd() {
+                        if (videoPlayer.currentTime >= segmentEndTime) {
+                            if (loopToggle.checked) {
+                                videoPlayer.currentTime = segmentStartTime;
+                                videoPlayer.play();
+                            } else {
+                                videoPlayer.pause();
+                            }
+                        }
+                    }
+                    
+                    // Update playback functions to use new values
+                    function playSegment() {
+                        videoPlayer.currentTime = segmentStartTime;
+                        videoPlayer.play();
+                    }
+
+                    function replayLastSeconds() {
+                        const newTime = Math.max(segmentStartTime, videoPlayer.currentTime - 3);
+                        videoPlayer.currentTime = newTime;
+                        videoPlayer.play();
+                    }
+                    
+                    // Update the UI display
+                    const timeDisplays = document.querySelectorAll('.text-muted');
+                    timeDisplays.forEach(function(display) {
+                        if (display.textContent.includes('s -')) {
+                            display.textContent = `${startTime.toFixed(1)}s - ${endTime.toFixed(1)}s`;
+                        } else if (display.textContent.endsWith('s') && !display.textContent.includes(' - ')) {
+                            const duration = endTime - startTime;
+                            display.textContent = `${duration.toFixed(1)}s`;
+                        }
+                    });
+                    
+                    // Hide modal
+                    const modal = document.getElementById('timing-adjustment-modal');
+                    if (modal) {
+                        const bsModal = bootstrap.Modal.getInstance(modal);
+                        if (bsModal) bsModal.hide();
+                    }
+                    
+                    // Restart video at new segment start
+                    videoPlayer.currentTime = startTime;
+                    
+                } else {
+                    if (window.Toast) {
+                        window.Toast.show('Error updating timing: ' + (responseData.error || 'Unknown error'), 'danger');
+                    }
+                    console.error('Server returned error:', responseData.error);
+                }
+            })
+            .catch(function(error) {
+                console.error('Error updating timing:', error);
+                if (window.Toast) {
+                    window.Toast.show('Network error occurred: ' + error.message, 'danger');
+                }
+            })
+            .finally(function() {
+                // Re-enable button
+                saveTimingBtn.disabled = false;
+                saveTimingBtn.innerHTML = '<i class="fas fa-save me-1"></i> Save Changes';
+            });
+        });
+    }
+
+    // Audio issue report functionality
+    const submitIssueBtn = document.getElementById('submit-issue-btn');
+    if (submitIssueBtn) {
+        submitIssueBtn.addEventListener('click', function() {
+            const issueType = document.querySelector('input[name="issueType"]:checked');
+            const issueNotes = document.getElementById('issue-notes');
+            
+            if (!issueType) {
+                if (window.Toast) {
+                    window.Toast.show('Please select an issue type', 'warning');
+                }
+                return;
+            }
+            
+            const data = {
+                issue_type: issueType.value,
+                notes: issueNotes ? issueNotes.value.trim() : '',
+                timestamp: videoPlayer.currentTime
+            };
+            
+            fetch('/api/segments/{{ video.video_id }}/{{ segment_index }}/audio-issue', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.success) {
+                    if (window.Toast) {
+                        window.Toast.show('Audio issue reported successfully!', 'success');
+                    }
+                    
+                    // Hide modal
+                    const modal = document.getElementById('audio-issue-modal');
+                    if (modal) {
+                        const bsModal = bootstrap.Modal.getInstance(modal);
+                        if (bsModal) bsModal.hide();
+                    }
+                    
+                    // Reset form
+                    const form = document.getElementById('audio-issue-form');
+                    if (form) {
+                        form.reset();
+                    }
+                } else {
+                    if (window.Toast) {
+                        window.Toast.show('Error reporting issue: ' + (data.error || 'Unknown error'), 'danger');
+                    }
+                }
+            })
+            .catch(function(error) {
+                console.error('Error:', error);
+                if (window.Toast) {
+                    window.Toast.show('Network error occurred: ' + error.message, 'danger');
+                }
+            });
+        });
+    }
+
+    // Auto-scroll segment timeline
+    function scrollActiveSegmentIntoView() {
+        const segmentContainer = document.querySelector('.segment-timeline .overflow-auto');
+        const activeSegment = document.querySelector('.segment-timeline .btn-primary');
+        
+        if (segmentContainer && activeSegment) {
+            const containerRect = segmentContainer.getBoundingClientRect();
+            const buttonRect = activeSegment.getBoundingClientRect();
+            
+            // Check if button is partially or fully outside the visible area
+            if (buttonRect.right > containerRect.right || buttonRect.left < containerRect.left) {
+                // Calculate scroll position to center the button
+                const scrollLeft = activeSegment.offsetLeft - (segmentContainer.clientWidth / 2) + (activeSegment.offsetWidth / 2);
+                segmentContainer.scrollTo({
+                    left: scrollLeft,
+                    behavior: 'smooth'
+                });
+            }
+        }
+    }
+
+    // Call scroll function on page load
+    scrollActiveSegmentIntoView();
+
+    // Call scroll function when navigating between segments
+    document.querySelectorAll('.segment-jump').forEach(function(btn) {
+        const originalClick = btn.onclick;
+        btn.onclick = function(e) {
+            if (originalClick) originalClick.call(this, e);
+            setTimeout(scrollActiveSegmentIntoView, 100);
+        };
+    });
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .verification-progress .segment-jump {
+        min-width: 2.5rem;
+        padding: 0.25rem;
+    }
+    
+    .verification-progress .segment-timeline {
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .video-controls {
+        gap: 0.5rem;
+    }
+    
+    @media (max-width: 768px) {
+        .video-controls {
+            flex-direction: column;
+        }
+        
+        .video-controls .btn-group {
+            width: 100%;
+        }
+    }
+    
+    /* Auto-expand textarea */
+    .auto-expand-textarea {
+        overflow: hidden;
+        resize: none;
+        transition: height 0.2s ease;
+        box-sizing: border-box;
+    }
+    
+    /* Segment navigation scroll behavior */
+    .segment-timeline .overflow-auto {
+        scroll-behavior: smooth;
+        position: relative;
+    }
+    
+    .segment-timeline .btn-primary {
+        position: relative;
+        z-index: 1;
+    }
+    
+    .caption-textarea-container {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+        overflow: hidden;
+    }
+    
+    .caption-textarea-container .auto-expand-textarea {
+        flex-grow: 1;
+        width: 100%;
+    }
+</style>
+{% endblock %}

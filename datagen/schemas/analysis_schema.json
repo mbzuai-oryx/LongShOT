@@ -1,0 +1,28 @@
+{
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "scenario_task_schema",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "scenario": { "type": "string" },
+                "tasks": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              },
+              "required": ["scenario", "tasks"]
+            }
+          }
+        },
+        "required": ["scenarios"]
+      }
+    }
+  }
+}

@@ -1,0 +1,76 @@
+# Add YouTube video IDs one per line
+# Format: video_id[space/tab]title(optional)
+# Example:
+# dQw4w9WgXcQ Rick Astley - Never Gonna Give You Up
+
+# VIDEOS
+Z5KSdPqnvqA
+E8CtE7qTb-Q
+62r3UPrOS9k
+LSIbp6V7oac
+0QnyyjWrnxQ
+Z5KSdPqnvqA
+n_tMFytfkkc
+ExJZAegsOis
+IwgB7PbFUiA
+N79Dup5Gpr0
+5nIVl1kf2VU
+WbekanEVV4M
+dwZK6iQlyEw
+c5AN0JDmQY4
+m5hLUknIi5c
+Pk-VgN0psu4
+wmOxub9NX7s
+qXAa48RBMXc
+MwzaSfkmLGY
+xWOf6TdDX2I
+TvK3m0wJutI
+l2pBvEfdDm0
+RlF6YPpqqMI
+8XVGsVhFdhk
+mtAcmGsc0Dk
+nUOVF6rgNsw
+y_xBnH32UdI
+h9HPjk1lJsA
+DScOsKwUAbc
+j4ERiK3GlI0
+_AKwCwKxZ7k
+vQtLms02PFM
+bKozKtcfwD8
+Ww06qzqEdy8
+C0AzJqEo9R8
+9ezkoWqmSss
+OTVmlXL33d8
+
+#Filtered - 2
+xwC9Hma_umc
+XHSYAlsIc2I
+zpp3AKx8-Vg
+raCSAZB-678
+gYHI1ZVvaoA
+XSrSXhhsehk
+jBGv2bDomkI
+FLmHfwkMAaU
+efrMuhN5UnQ
+MEOZkf4imaM
+aqz-KE-bpKQ
+_L5hKg-FafU
+H_IyQKh3Y-E
+8uXh3_bt77M
+_kY7M6KL15k
+PigmOEslNr8
+y4rfM0pdT1g
+nyW6mZwTjU8
+Drg32RKhAMQ
+-iTC_a6_rQI
+_0Dp9I3_7aQ
+wmfuIrjBGeU
+PKuO3cjUma0
+MegeYcdphzE
+IkBJU8BbrUs
+oRfW-0rAY6w
+7jyokhjUCyk
+BoT7qH_uVNo
+XfeuCfOUuXg
+8AOB2PtHfVM
+kyBpDjlLxVg

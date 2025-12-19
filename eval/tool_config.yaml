@@ -1,0 +1,64 @@
+# Video Benchmark Evaluation Configuration
+
+# Server Configuration
+server:
+  base_url: "http://localhost:8001/v1/"
+  port: "8001"
+  api_key: "DUMMY_KEY"
+
+# Model Generation Parameters  
+generation:
+  max_tokens: 4096
+  temperature: 0.1
+  top_p: 1.0
+  timeout: 1800  # seconds
+
+# Evaluation Parameters
+evaluation:
+  max_tokens: 512
+  temperature: 0.1
+  top_p: 1.0
+  timeout: 180  # seconds
+
+# vLLM Server Configuration for Candidate Model
+vllm_candidate:
+  max_model_len: ""
+  max_num_seqs: "8"
+  trust_remote_code: true
+  allowed_local_media_path: "/"
+  enable_prefix_caching: true
+  additional_args: [
+    # "--gpu-memory-utilization", "0.75",
+  ]  # Add any additional vllm arguments here
+
+# vLLM Server Configuration for Evaluation Model  
+vllm_evaluation:
+  max_model_len: "32768"
+  max_num_seqs: "256"
+  trust_remote_code: true
+  # allowed_local_media_path: "/"
+  enable_prefix_caching: true
+  # additional_args: [
+  #   "--limit-mm-per-prompt" , "{'image':0, 'video' : 0}"
+  # ]  # Add any additional vllm arguments here
+
+# Paths Configuration
+paths:
+  logs_dir: "logs"
+  video_path: "../validation_tool/dataset/videos"
+
+# System Configuration
+system:
+  system_prompt: ""  # Optional system prompt
+  dataset_limit: 0  # Set to 0 for unlimited, positive number for limit
+  server_check_timeout: 5  # Timeout for server readiness checks
+
+# VideoRAG Configuration
+videorag:
+  working_dir: "./videorag_workdir"  # Directory where VideoRAG stores indexed videos
+  enabled: true  # Enable VideoRAG functionality
+  model_name: "Qwen/Qwen3-4B-Instruct-2507"  # LLM model to use with VideoRAG
+  video_segment_length: 30  # Video segment length in seconds
+  retrieval_topk: 4  # Number of top segments to retrieve
+  chunk_token_size: 1200  # Token size for text chunks
+  # Note: VideoRAG uses sentence-transformers (all-MiniLM-L6-v2) for embeddings

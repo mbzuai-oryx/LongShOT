@@ -67,12 +67,20 @@ To download videos from YouTube, you need to provide authentication cookies:
 3. Click on the extension icon and copy the cookies
 4. Paste the cookies into `preprocess/cookies.txt`
 
-### Download Videos
+### Download Audio Flamingo Model
 
-Navigate to the preprocess directory and download videos:
+Navigate to the preprocess directory and download the Audio Flamingo model:
 
 ```bash
 cd preprocess
+hf download nvidia/audio-flamingo-3 --local-dir ./MODELS/audio-flamingo-3/
+```
+
+### Download Videos
+
+Download videos from YouTube:
+
+```bash
 python download_youtube_videos.py
 ```
 

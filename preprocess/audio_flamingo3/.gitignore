@@ -1,0 +1,53 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+# Byte-compiled / optimized / DLL files
+*.pyo
+*.pyd
+# C extensions
+*.so
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+.eggs/
+.eggs-info/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+.installed.cfg
+*.egg-info
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+# Nested virtual environments
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+
+# Nested pycache directories
+**/__pycache__/
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+# Pytest cache
+.pytest_cache/
+
+test_audio_variations/
+*.json
+*.csv
+*.log
+
+# preprocessing cache
+preprocessing*/
+
+.claude/
+audio_segments/

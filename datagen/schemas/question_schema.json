@@ -1,0 +1,91 @@
+{
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "benchmark_questions_schema",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "single_turn_questions": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "properties": {
+                "question": { "type": "string" },
+                "difficulty": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                },
+                "modalities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["visual", "audio", "speech"]
+                  },
+                  "minItems": 1,
+                  "maxItems": 3
+                },
+                "key_segments": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "minItems": 1,
+                  "maxItems": 10
+                }
+              },
+              "required": ["question", "difficulty", "modalities", "key_segments"]
+            }
+          },
+          "multi_turn_questions": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "question": { "type": "string" },
+                  "difficulty": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "conversation_role": {
+                    "type": "string",
+                    "enum": ["opener", "deepener", "challenger", "synthesizer"]
+                  },
+                  "modalities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["visual", "audio", "speech"]
+                    },
+                    "minItems": 1,
+                    "maxItems": 3
+                  },
+                  "key_segments": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "minItems": 1,
+                    "maxItems": 10
+                  }
+                },
+                "required": ["question", "difficulty", "conversation_role", "modalities", "key_segments"]
+              }
+            }
+          }
+        },
+        "required": ["single_turn_questions", "multi_turn_questions"]
+      }
+    }
+  }
+}

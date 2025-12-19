@@ -1,0 +1,118 @@
+You are creating evaluation criteria to assess how well AI models answer questions about videos. The reference answers are conversational, so your criteria should focus on whether the model captured the key factual content, regardless of whether they use formal or conversational language.
+
+Task:
+Given a Q&A pair, generate criteria that identify the essential factual elements any correct answer must include, while allowing flexibility in how those facts are expressed.
+
+Evaluation Framework:
+- **High-Priority** (Weight: 5): Essential facts - if missing, the answer fails to help the questioner
+- **Medium-Priority** (Weight: 3): Important details that add value and show understanding  
+- **Low-Priority** (Weight: 1): Additional context that enriches the answer
+- **Penalties** (Negative Weights): Factual errors or misleading information that would confuse the questioner
+
+FOCUS ON CONTENT, NOT STYLE:
+- Accept both "They looked frustrated" and "The subjects exhibited negative affect" 
+- Accept both "around 2:30" and "at the 2-minute 30-second mark"
+- Value completeness of information over formal language
+- Don't penalize conversational tone or natural expressions
+
+Question Type Adaptation:
+- **Factual Questions**: Did they get the key facts right? Did they miss important information?
+- **Reasoning Questions**: Is their logic sound? Did they explain why something happened?
+- **Procedural Questions**: Did they cover the main steps? Are they in the right order?
+- **"What happened" Questions**: Did they capture the main events and their significance?
+
+Criteria Requirements:
+- **One focus per criterion**: Each criterion should check one specific fact or element
+- **Be specific**: Include actual entities, actions, or events from the video 
+- **Be verifiable**: Someone should be able to clearly judge pass/fail from the video content
+- **Be essential**: Focus on information that genuinely matters for answering the question
+- **Allow natural expression**: Don't require specific wording, just the factual content
+
+Input:
+{Question_answer_pair}
+
+Output JSON:
+[
+  {
+    "name": "factual_correctness",
+    "description": "Must mention that the coach told players to watch the opponent's hips",
+    "category": "high_priority",
+    "is_penalty": false
+  },
+  {
+    "name": "hallucination",
+    "description": "Must not include information not present or supported in the video",
+    "category": "penalty", 
+    "is_penalty": true
+  }
+]
+
+Guidelines:
+- **Maximum 5 criteria total** - focus on what really matters
+- **Use different category names** - never repeat the same name (e.g., don't have multiple "factual_correctness")
+- **Distribute facts across categories** - assign different types of facts to different category names
+- **Be extremely specific** - include exact facts, names, numbers, actions from the video
+- **Focus on essential facts only** - ignore commentary, analysis, or interpretive observations
+- **Make it judge-friendly** - an LLM should be able to scan the answer and check if the specific fact is there
+- **Be literal** - the judge needs to know exactly what words/facts to look for
+
+**EXAMPLE: Good criteria with proper name distribution:**
+```json
+[
+  {
+    "name": "factual_correctness",
+    "description": "Must mention that the AI-powered dog washer is a real machine shown working",
+    "category": "high_priority",
+    "is_penalty": false
+  },
+  {
+    "name": "key_details", 
+    "description": "Must mention that it has sensors and cameras that adjust water pressure",
+    "category": "high_priority",
+    "is_penalty": false
+  },
+  {
+    "name": "completeness",
+    "description": "Must mention that it was demonstrated on a real dog",
+    "category": "medium_priority", 
+    "is_penalty": false
+  },
+  {
+    "name": "hallucination",
+    "description": "Must not include information not present or supported in the video",
+    "category": "penalty",
+    "is_penalty": true
+  }
+]
+```
+
+**Bad criteria examples:**  
+- Multiple "factual_correctness" entries (violates no-repeat rule)
+- "Must demonstrate understanding of the absurdity" (captures commentary, not facts)
+- "Must explain why the speaker found it funny" (too vague, interpretive)
+
+**CATEGORY NAME DISTRIBUTION STRATEGY:**
+Use different names for different types of facts - NEVER repeat the same name:
+
+- **"factual_correctness"** - for the most important core fact (use only once)
+- **"key_details"** - for important specific details (use only once)  
+- **"completeness"** - for coverage of main elements (use only once)
+- **"accuracy"** - for precision of numbers, names, or specifics (use only once)
+- **"essential_information"** - for critical context needed to answer (use only once)
+
+**Penalty criteria names:**
+- "hallucination", "contradiction", "temporal_error", "entity_error", "factual_error"
+
+**Standard Penalty Descriptions (use these exact descriptions):**
+- "hallucination": "Must not include information not present or supported in the video"
+- "contradiction": "Must not contain self-contradictory statements" 
+- "temporal_error": "Must not provide incorrect timing or sequence of events"
+- "entity_error": "Must not misidentify people, objects, or locations"
+- "factual_error": "Must not state facts that contradict what actually happened in the video"
+
+**FINAL REMINDERS:**
+- **Never use the same category name twice** - each criterion must have a unique name
+- **Focus on facts, not commentary** - ignore analytical observations in the reference answer  
+- **Essential facts only** - what does the questioner actually need to know?
+- **Judge-friendly descriptions** - an LLM should easily verify if the fact is present
+- **Content over style** - accept any phrasing as long as the fact is there

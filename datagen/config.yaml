@@ -1,0 +1,64 @@
+# Video Analysis System Configuration
+
+vllm:
+  # vLLM server configuration (user must provide the URL)
+  base_url: "http://localhost:8001/v1"  # Change this to your vLLM server URL with /v1 path
+  # API endpoints
+  endpoints:
+    completions: "/v1/completions"
+    chat: "/v1/chat/completions"
+  
+  # Request settings
+  model: "Qwen/Qwen3-30B-A3B-Instruct-2507"  # Change to your model name
+  # model: "Qwen/QwQ-32B"  # Updated model name
+  # model: "Qwen/Qwen3-235B-A22B-Thinking-2507"
+  max_tokens: 40000
+  temperature: 0.7
+  
+  # Use guided_json for structured output (more performant than response_format)
+  use_guided_json: true
+
+# Processing settings
+processing:
+  # Concurrency control
+  max_concurrent_requests: 10  # Further reduced for thinking models
+  # batch_size: 5
+  
+  # File handling
+  input_directory: "../preprocess/dataset/final"
+  output_directory: "./results"
+  file_pattern: "*.json"
+  
+  # Incremental saving settings
+  incremental_save: true
+  save_batch_size: 1  # Save every successful response immediately
+  
+  # Progress tracking
+  log_level: "INFO"
+  progress_update_interval: 5  # Update progress every 5 items
+  
+  # Error handling
+  continue_on_error: true
+  max_errors: 10
+
+# Timeout settings for thinking models
+timeout: 900  # 15 minutes for thinking models
+connection_timeout: 60  # Connection timeout
+
+# System settings
+system:
+  # Resource management
+  memory_limit_mb: 4096
+  
+  # Logging
+  log_format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  log_file: "./logs/video_analysis.log"
+
+# Model configuration for pipeline compatibility
+model:
+  name: "Qwen/Qwen3-30B-A3B-Instruct-2507"
+  # name: "Qwen/QwQ-32B"
+  # name: "Qwen/Qwen3-235B-A22B-Thinking-2507"
+  base_url: "http://localhost:8001/v1"
+  max_tokens: 40000
+  temperature: 0.7

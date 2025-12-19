@@ -1,0 +1,141 @@
+You are analyzing video metadata to identify natural contexts and perspectives from which people would be curious about this video content. Think about realistic situations where someone would want to understand what happened in the video.
+
+CRITICAL ANTI-HALLUCINATION REQUIREMENTS
+========================================
+- NEVER add details, objects, people, or events not explicitly mentioned in the video metadata
+- NEVER assume content based on typical expectations for video types
+- NEVER infer activities, locations, or contexts beyond what is directly described
+- ONLY reference what is explicitly documented in the provided metadata
+- If metadata is sparse, create fewer but more grounded scenarios
+- Every scenario element must be verifiable against the source metadata
+
+Your Task
+
+Your job is to:
+1. **CAREFULLY** analyze the metadata to understand ONLY what is explicitly described in the video.
+2. Generate diverse, realistic scenarios representing different natural human perspectives for viewing this content.
+3. For each scenario, identify what kinds of questions a person in that context would naturally ask.
+4. Map those natural curiosities to evaluation task categories (to ensure comprehensive testing).
+
+Requirements
+1. **Think like real people**: Consider realistic situations where someone would watch this video and be curious.
+2. **Natural multimodal interest**: People naturally connect what they see, hear, and observe - scenarios should reflect this.
+3. **Diverse perspectives**: Cover different reasons why people might watch (learning, entertainment, analysis, etc.).
+4. **Distinct contexts**: Each scenario should represent a meaningfully different viewing situation.
+5. **STRICT METADATA GROUNDING**: Every scenario must be completely supportable by the provided metadata.
+
+Input:
+Structured or free-form metadata describing the visual, auditory, and speech content of a video.
+{video_metadata}
+
+Output format (strict JSON):
+{
+  "scenarios": [
+    {
+      "scenario": "<concise scenario description>",
+      "tasks": ["<task_1>", "<task_2>", "..."]
+    }
+  ]
+}
+
+Each scenario must:
+- Represent a realistic context where someone would watch this video
+- Be 1–2 sentences describing the viewing context and natural curiosity
+- **STRICTLY GROUNDED**: Use ONLY information explicitly present in the video metadata
+- **NO HALLUCINATION**: Do not add ANY details, objects, people, locations, or activities not mentioned in metadata
+- **VERIFIABLE**: Every element must be checkable against the provided metadata
+- Lead to questions people would naturally ask based on what's actually documented
+- Map to evaluation task categories that test the required capabilities
+
+Task Categories to Evaluate:
+
+Core Perception Tasks: 
+entity_recognition (people, objects, brands, animals, landmarks, products, vehicles)
+ocr_text_extraction (documents, signs, handwriting, screens, multiple languages)
+event_understanding (action detection, event sequences, event boundaries, state changes)
+temporal_reasoning (duration, ordering, timestamps, frequency, temporal grounding)
+spatial_reasoning (object locations, navigation, distance, spatial relationships, 3D understanding)
+audio_understanding (speech transcription, speaker identification, sound recognition, music analysis)
+visual_scene_understanding (scene classification, lighting conditions, weather, indoor/outdoor)
+motion_analysis (tracking, trajectory, speed, direction changes)
+
+Reasoning Tasks:
+causal_reasoning (cause-effect, predictions, consequences)
+commonsense_reasoning (social norms, physics understanding, everyday logic)
+mathematical_reasoning (counting, calculations, measurements, statistics)
+compositional_reasoning (multi-step logic, combining information)
+comparative_analysis (differences, similarities, changes over time)
+pattern_recognition (recurring events, anomalies, trends)
+counterfactual_reasoning (“what if” scenarios, hypothetical outcomes, forecasting)
+
+Information Tasks:
+information_retrieval (facts, instructions, contact info, prices, specifications) (1-2 sentences)
+summarization (key points, highlights, action items, narrative summary)
+question_answering (factual, inferential, hypothetical)
+instruction_extraction (procedures, recipes, tutorials, guidelines) (detailed answers)
+
+Multimodal Tasks:
+multimodal_synthesis (combining visual+audio+text information)
+cross_modal_verification (checking consistency across modalities)
+audio_visual_alignment (lip sync, sound source localization)
+multimodal_translation (describing visual in text, audio in text)
+
+Specialized Tasks:
+sentiment_analysis (emotion, mood, tone, stress detection)
+accessibility_support (scene description, caption generation)
+privacy_security_reasoning (PII detection, sensitive content)
+safety_monitoring (hazard detection, emergency situations)
+ethical_reasoning (detecting sensitivities in context of ethical)
+
+METADATA GROUNDING EXAMPLES:
+
+**CORRECT - Grounded in metadata:**
+If metadata mentions "a person cooking pasta in a kitchen with visible recipe book":
+- "Someone following the recipe wants to understand the cooking steps shown and what ingredients are visible" → instruction_extraction, entity_recognition, event_understanding
+
+**INCORRECT - Hallucinated content:**
+"Someone wants to learn Italian cooking techniques" (assumes Italian cuisine not mentioned in metadata)
+"A chef wants to understand advanced pasta-making skills" (assumes skill level not mentioned)
+"Someone planning a dinner party wants to know cooking times" (assumes dinner party context not present)
+
+**CORRECT - Only what's documented:**
+If metadata states "two people discussing charts on a whiteboard with financial data":
+- "Someone reviewing the meeting wants to understand what financial information was presented and what conclusions were reached" → ocr_text_extraction, information_retrieval, summarization
+
+**INCORRECT - Adding assumptions:**
+"Business students learning about market analysis" (assumes educational context)
+"Executives making quarterly decisions" (assumes corporate context and timing)
+
+VALIDATION CHECKLIST:
+- Can every detail in my scenario be found in the metadata? - CORRECT
+- Did I add any context not explicitly mentioned? - WRONG
+- Would someone reading only my scenario know what's actually in the video? - CORRECT
+
+IMPORTANT CONSTRAINTS:
+- Generate a MAXIMUM of 3 scenarios per video
+- Each scenario must have a MAXIMUM of 2 tasks assigned to it
+- Focus on realistic viewing contexts that lead to natural questions
+- Ensure comprehensive evaluation coverage through natural curiosity
+
+**Scenario Guidelines:**
+1. **Different viewing contexts**: Each scenario should represent a distinct reason someone would watch
+2. **Natural curiosity**: Focus on what people would genuinely want to know
+3. **Realistic situations**: Avoid academic or artificial viewing contexts
+4. **Diverse capabilities**: Ensure different scenarios test different multimodal capabilities
+5. **Quality over quantity**: Better to have fewer, more realistic scenarios
+6. **METADATA FIDELITY**: Every scenario must be completely derivable from the provided metadata
+
+**Task Selection Strategy:**
+- Choose tasks based on what questions would naturally arise in each viewing context
+- Multimodal tasks should emerge naturally from the scenario, not be forced
+- Prioritize tasks that test capabilities people actually need in real situations
+- **GROUND IN METADATA**: Tasks must test understanding of content explicitly present in metadata
+
+**FINAL VALIDATION:**
+Before finalizing scenarios, ask yourself:
+1. Is every detail in my scenario explicitly mentioned in the metadata?
+2. Can someone verify each scenario element by checking the metadata?
+3. Did I avoid adding any assumed context, locations, activities, or details?
+4. Would my scenarios still make sense if the metadata were different?
+
+**Remember:** These scenarios drive the entire downstream pipeline. Natural, realistic scenarios that are strictly grounded in metadata lead to conversational questions that create a more useful and realistic video benchmark without hallucinated content.

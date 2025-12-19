@@ -1,0 +1,682 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management - Arabic Video Dataset{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>User Management</h1>
+            <p class="text-muted">Manage users and their assignments</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- User List -->
+        <div class="col-md-4">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>Users</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush user-list">
+                        {% for user in users %}
+                        <button type="button" class="list-group-item list-group-item-action user-item" data-user-id="{{ user.id }}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-0">{{ user.username }}</h6>
+                                    <small class="text-muted">{{ user.email }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-primary">{{ user.assigned_videos }} videos</span>
+                                    <div class="text-muted small">{{ user.verified_segments }} segments</div>
+                                </div>
+                            </div>
+                            <div class="progress mt-2" style="height: 4px;">
+                                <div class="progress-bar bg-success" role="progressbar" 
+                                     style="width: {{ user.completion_percentage }}%"
+                                     aria-valuenow="{{ user.completion_percentage }}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                </div>
+                            </div>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Details Panel -->
+        <div class="col-md-8">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-user me-2"></i><span id="selected-username">Select a User</span></h5>
+                    <div class="btn-group">
+                        <button id="unassign-all-btn" class="btn btn-light btn-sm" style="display: none;">
+                            <i class="fas fa-trash-alt me-1"></i>Unassign All Videos
+                        </button>
+                        <button id="assign-new-btn" class="btn btn-light btn-sm" style="display: none;">
+                            <i class="fas fa-plus me-1"></i>Assign New Videos
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Initial state -->
+                    <div id="no-user-selected" class="text-center py-5">
+                        <i class="fas fa-user-circle fa-4x text-muted mb-3"></i>
+                        <h5>Select a user from the list</h5>
+                        <p class="text-muted">User details will appear here</p>
+                    </div>
+                    
+                    <!-- User details (hidden initially) -->
+                    <div id="user-details" style="display: none;">
+                        <div class="row">
+                            <!-- User Statistics -->
+                            <div class="col-md-4 mb-4">
+                                <div class="card h-100">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Statistics</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="stat-item mb-3">
+                                            <div class="small text-muted">Assigned Videos</div>
+                                            <div class="h4" id="user-assigned-count">0</div>
+                                        </div>
+                                        <div class="stat-item mb-3">
+                                            <div class="small text-muted">Verified Segments</div>
+                                            <div class="h4" id="user-segments-count">0</div>
+                                        </div>
+                                        <div class="stat-item">
+                                            <div class="small text-muted">Hours Worked</div>
+                                            <div class="h4" id="user-hours-worked">0</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- User Info -->
+                            <div class="col-md-8 mb-4">
+                                <div class="card h-100">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>User Information</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="user-info">
+                                            <div class="row mb-2">
+                                                <div class="col-md-4 text-muted">Email:</div>
+                                                <div class="col-md-8" id="user-email"></div>
+                                            </div>
+                                            <div class="row mb-2">
+                                                <div class="col-md-4 text-muted">Account Created:</div>
+                                                <div class="col-md-8" id="user-created-at"></div>
+                                            </div>
+                                            <div class="row mb-2">
+                                                <div class="col-md-4 text-muted">Role:</div>
+                                                <div class="col-md-8" id="user-role"></div>
+                                            </div>
+                                            <div class="row mb-2">
+                                                <div class="col-md-4 text-muted">Completion Rate:</div>
+                                                <div class="col-md-8">
+                                                    <div class="progress">
+                                                        <div class="progress-bar bg-success" id="user-completion-bar" 
+                                                             role="progressbar" style="width: 0%">
+                                                            <span id="user-completion-text">0%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- User's Assigned Videos -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="fas fa-tasks me-2"></i>Assigned Videos</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover" id="assignments-table">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Video</th>
+                                                <th>Duration</th>
+                                                <th>Progress</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="assignments-body">
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted py-4">
+                                                    <i class="fas fa-spinner fa-spin me-2"></i>Loading assignments...
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Activity -->
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="fas fa-history me-2"></i>Recent Activity</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="list-group list-group-flush" id="activity-list">
+                                    <div class="list-group-item text-center text-muted py-4">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>Loading activity...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+<!-- Unassign All Confirmation Modal -->
+<div class="modal fade" id="unassign-all-modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Unassign All Videos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    This will remove <strong>all</strong> video assignments from <strong id="unassign-username">this user</strong>.
+                </div>
+                <p>
+                    Are you sure you want to unassign all videos? This action cannot be undone.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-unassign-all">
+                    <i class="fas fa-trash-alt me-1"></i>Unassign All
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assign New Videos Modal -->
+<div class="modal fade" id="assign-videos-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Assign Videos to <span id="assign-username"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Select videos to assign to this user. Only unassigned videos with captions are shown.
+                </div>
+                
+                <!-- Video selection list -->
+                <div class="video-selection mb-3">
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" class="form-control" id="video-search" placeholder="Search videos...">
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush" id="available-videos" style="max-height: 400px; overflow-y: auto;">
+                                <div class="list-group-item text-center py-4">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>Loading available videos...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <div>
+                    <span class="text-muted"><span id="selected-videos-count">0</span> videos selected</span>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirm-assign-videos" disabled>
+                        Assign Selected Videos
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/dateUtils.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentUserId = null;
+    const userItems = document.querySelectorAll('.user-item');
+    const noUserSelected = document.getElementById('no-user-selected');
+    const userDetails = document.getElementById('user-details');
+    const selectedUsername = document.getElementById('selected-username');
+    const unassignAllBtn = document.getElementById('unassign-all-btn');
+    const assignNewBtn = document.getElementById('assign-new-btn');
+    
+    // User selection
+    userItems.forEach(item => {
+        item.addEventListener('click', function() {
+            // Clear previous selection
+            userItems.forEach(i => i.classList.remove('active'));
+            
+            // Set new selection
+            this.classList.add('active');
+            currentUserId = this.dataset.userId;
+            
+            // Show user details
+            noUserSelected.style.display = 'none';
+            userDetails.style.display = 'block';
+            
+            // Show action buttons
+            unassignAllBtn.style.display = 'inline-block';
+            assignNewBtn.style.display = 'inline-block';
+            
+            // Load user details
+            loadUserDetails(currentUserId);
+        });
+    });
+    
+    // Load user details from API
+    async function loadUserDetails(userId) {
+        try {
+            const response = await fetch(`/api/user/${userId}`);
+            if (!response.ok) {
+                throw new Error('Failed to load user details');
+            }
+            
+            const data = await response.json();
+            updateUserDetails(data);
+        } catch (error) {
+            console.error('Error loading user details:', error);
+            Toast.show('Failed to load user details', 'danger');
+        }
+    }
+    
+    // Update user details in the UI
+    function updateUserDetails(data) {
+        const user = data.user;
+        
+        // Update header
+        selectedUsername.textContent = user.username;
+        document.getElementById('unassign-username').textContent = user.username;
+        document.getElementById('assign-username').textContent = user.username;
+        
+        // Update statistics
+        document.getElementById('user-assigned-count').textContent = data.assignments.length;
+        document.getElementById('user-segments-count').textContent = user.total_segments_verified;
+        document.getElementById('user-hours-worked').textContent = user.hours_worked.toFixed(1);
+        
+        // Update user info
+        document.getElementById('user-email').textContent = user.email;
+        const createdAtEl = document.getElementById('user-created-at');
+        createdAtEl.setAttribute('data-utc-date', user.created_at);
+        createdAtEl.setAttribute('data-date-format', 'YYYY-MM-DD HH:mm');
+        document.getElementById('user-role').textContent = user.is_admin ? 'Admin' : 'Regular User';
+        
+        // Calculate completion rate
+        const completedAssignments = data.assignments.filter(a => a.status === 'completed').length;
+        const completionRate = data.assignments.length > 0 ? 
+            Math.round((completedAssignments / data.assignments.length) * 100) : 0;
+        
+        // Update progress bar
+        const completionBar = document.getElementById('user-completion-bar');
+        completionBar.style.width = `${completionRate}%`;
+        document.getElementById('user-completion-text').textContent = `${completionRate}%`;
+        
+        // Update assignments table
+        updateAssignmentsTable(data.assignments);
+        
+        // Update activity list
+        updateActivityList(data.recent_activity);
+        
+        // Initialize date conversions for newly added DOM elements
+        DateUtils.initDateConversions();
+    }
+    
+    // Update assignments table
+    function updateAssignmentsTable(assignments) {
+        const tableBody = document.getElementById('assignments-body');
+        
+        if (assignments.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        <i class="fas fa-inbox me-2"></i>No videos assigned
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tableBody.innerHTML = '';
+        assignments.forEach(assignment => {
+            const row = document.createElement('tr');
+            
+            // Format duration
+            const minutes = Math.floor(assignment.duration / 60);
+            const seconds = assignment.duration % 60;
+            const formattedDuration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Determine status badge
+            let statusBadge;
+            if (assignment.status === 'completed') {
+                statusBadge = `<span class="badge bg-success">Completed</span>`;
+            } else if (assignment.progress > 0) {
+                statusBadge = `<span class="badge bg-info">In Progress</span>`;
+            } else {
+                statusBadge = `<span class="badge bg-warning">Not Started</span>`;
+            }
+            
+            row.innerHTML = `
+                <td>
+                    <a href="/video/${assignment.video_id}" class="text-decoration-none">
+                        <strong>${assignment.title}</strong>
+                    </a>
+                    <div class="small text-muted">Assigned: <span data-utc-date="${assignment.assigned_at}" data-date-only></span></div>
+                </td>
+                <td>${formattedDuration}</td>
+                <td>
+                    <div class="progress" style="width: 100px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: ${assignment.progress}%"
+                             aria-valuenow="${assignment.progress}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            ${Math.round(assignment.progress)}%
+                        </div>
+                    </div>
+                    <div class="small text-muted mt-1">
+                        ${assignment.verified_segments}/${assignment.total_segments} segments
+                    </div>
+                </td>
+                <td>${statusBadge}</td>
+                <td>
+                    <div class="btn-group">
+                        <a href="/video/${assignment.video_id}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <button class="btn btn-sm btn-outline-danger unassign-btn" data-video-id="${assignment.video_id}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+        
+        // Add event listeners for unassign buttons
+        document.querySelectorAll('.unassign-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const videoId = this.dataset.videoId;
+                unassignVideo(currentUserId, videoId);
+            });
+        });
+    }
+    
+    // Update activity list
+    function updateActivityList(activities) {
+        const activityList = document.getElementById('activity-list');
+        
+        if (activities.length === 0) {
+            activityList.innerHTML = `
+                <div class="list-group-item text-center text-muted py-4">
+                    <i class="fas fa-clock me-2"></i>No recent activity
+                </div>
+            `;
+            return;
+        }
+        
+        activityList.innerHTML = '';
+        activities.forEach(activity => {
+            // Determine status badge
+            let statusBadge = '';
+            if (activity.status === 'approved') {
+                statusBadge = `<span class="badge bg-success ms-2">Approved</span>`;
+            } else if (activity.status === 'edited') {
+                statusBadge = `<span class="badge bg-info ms-2">Edited</span>`;
+            }
+            
+            const item = document.createElement('div');
+            item.className = 'list-group-item';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <a href="/video/${activity.video_id}" class="text-decoration-none">
+                            ${activity.title}
+                        </a>
+                        ${statusBadge}
+                    </div>
+                    <small class="text-muted" data-utc-date="${activity.verified_at}" data-date-format="YYYY-MM-DD HH:mm"></small>
+                </div>
+            `;
+            activityList.appendChild(item);
+        });
+    }
+    
+    // Unassign a video from a user
+    async function unassignVideo(userId, videoId) {
+        if (!confirm('Are you sure you want to unassign this video?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/user/${userId}/unassign/${videoId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                Toast.show('Video unassigned successfully', 'success');
+                // Reload user details
+                loadUserDetails(userId);
+            } else {
+                Toast.show(data.message || 'Failed to unassign video', 'danger');
+            }
+        } catch (error) {
+            console.error('Error unassigning video:', error);
+            Toast.show('Failed to unassign video', 'danger');
+        }
+    }
+    
+    // Set up unassign all functionality
+    unassignAllBtn.addEventListener('click', function() {
+        const modal = new bootstrap.Modal(document.getElementById('unassign-all-modal'));
+        modal.show();
+    });
+    
+    document.getElementById('confirm-unassign-all').addEventListener('click', async function() {
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processing...';
+        
+        try {
+            const response = await fetch(`/api/user/${currentUserId}/unassign-all`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                Toast.show(data.message, 'success');
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('unassign-all-modal')).hide();
+                // Reload user details
+                loadUserDetails(currentUserId);
+            } else {
+                Toast.show(data.message || 'Failed to unassign videos', 'danger');
+            }
+        } catch (error) {
+            console.error('Error unassigning all videos:', error);
+            Toast.show('Failed to unassign videos', 'danger');
+        } finally {
+            this.disabled = false;
+            this.innerHTML = '<i class="fas fa-trash-alt me-1"></i>Unassign All';
+        }
+    });
+    
+    // Set up assign new videos functionality
+    assignNewBtn.addEventListener('click', function() {
+        loadAvailableVideos();
+        const modal = new bootstrap.Modal(document.getElementById('assign-videos-modal'));
+        modal.show();
+    });
+    
+    // Load available videos for assignment
+    async function loadAvailableVideos() {
+        const videosList = document.getElementById('available-videos');
+        videosList.innerHTML = `
+            <div class="list-group-item text-center py-4">
+                <i class="fas fa-spinner fa-spin me-2"></i>Loading available videos...
+            </div>
+        `;
+        
+        try {
+            const response = await fetch('/api/v1/unassigned_videos');
+            if (!response.ok) {
+                throw new Error('Failed to load videos');
+            }
+            
+            const data = await response.json();
+            
+            if (!data.videos || data.videos.length === 0) {
+                videosList.innerHTML = `
+                    <div class="list-group-item text-center text-muted py-4">
+                        <i class="fas fa-inbox me-2"></i>No available videos to assign
+                    </div>
+                `;
+                return;
+            }
+            
+            videosList.innerHTML = '';
+            data.videos.forEach(video => {
+                const item = document.createElement('div');
+                item.className = 'list-group-item';
+                
+                // Format duration
+                const minutes = Math.floor(video.duration / 60);
+                const seconds = video.duration % 60;
+                const formattedDuration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                item.innerHTML = `
+                    <div class="form-check d-flex align-items-center">
+                        <input class="form-check-input video-select" type="checkbox" value="${video.video_id}" id="video-${video.video_id}">
+                        <label class="form-check-label ms-2 w-100" for="video-${video.video_id}">
+                            <div class="d-flex align-items-center">
+                                <img src="${video.thumbnail_url}" class="rounded me-2" style="width: 80px; height: 45px; object-fit: cover;">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>${video.title}</strong>
+                                        <span class="text-muted">${formattedDuration}</span>
+                                    </div>
+                                    <div class="small text-muted">${video.channel || 'No channel'}</div>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                `;
+                videosList.appendChild(item);
+            });
+            
+            // Add event listeners for video selection
+            document.querySelectorAll('.video-select').forEach(checkbox => {
+                checkbox.addEventListener('change', updateSelectedVideosCount);
+            });
+            
+            // Set up video search
+            document.getElementById('video-search').addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                document.querySelectorAll('.video-select').forEach(checkbox => {
+                    const item = checkbox.closest('.list-group-item');
+                    const title = item.querySelector('strong').textContent.toLowerCase();
+                    const channel = item.querySelector('.small.text-muted').textContent.toLowerCase();
+                    
+                    if (title.includes(searchTerm) || channel.includes(searchTerm)) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+            
+        } catch (error) {
+            console.error('Error loading available videos:', error);
+            videosList.innerHTML = `
+                <div class="list-group-item text-center text-danger py-4">
+                    <i class="fas fa-exclamation-circle me-2"></i>Failed to load videos
+                </div>
+            `;
+        }
+    }
+    
+    // Update selected videos count
+    function updateSelectedVideosCount() {
+        const selectedCount = document.querySelectorAll('.video-select:checked').length;
+        document.getElementById('selected-videos-count').textContent = selectedCount;
+        document.getElementById('confirm-assign-videos').disabled = selectedCount === 0;
+    }
+    
+    // Handle video assignment
+    document.getElementById('confirm-assign-videos').addEventListener('click', async function() {
+        const selectedVideos = Array.from(document.querySelectorAll('.video-select:checked')).map(cb => cb.value);
+        
+        if (selectedVideos.length === 0) {
+            Toast.show('Please select videos to assign', 'warning');
+            return;
+        }
+        
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Assigning...';
+        
+        try {
+            const response = await fetch('/api/v1/assign_videos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    videos: selectedVideos,
+                    users: [parseInt(currentUserId)]
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                Toast.show(data.message, 'success');
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('assign-videos-modal')).hide();
+                // Reload user details
+                loadUserDetails(currentUserId);
+            } else {
+                Toast.show(data.message || 'Failed to assign videos', 'danger');
+            }
+        } catch (error) {
+            console.error('Error assigning videos:', error);
+            Toast.show('Failed to assign videos', 'danger');
+        } finally {
+            this.disabled = false;
+            this.innerHTML = 'Assign Selected Videos';
+        }
+    });
+});
+</script>
+{% endblock %}

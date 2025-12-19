@@ -1,0 +1,340 @@
+{
+  "question_types": {
+    "factual_retrieval": [
+      {
+        "id": "direct_fact",
+        "name": "Direct Fact Extraction",
+        "description": "Extract specific factual information that is explicitly shown or stated in the video",
+        "example": "What color is the car that appears at 2:34?"
+      },
+      {
+        "id": "numerical_extraction",
+        "name": "Numerical Extraction",
+        "description": "Count or measure specific quantities, numbers, or amounts shown in the video",
+        "example": "How many people entered the room during the meeting?"
+      },
+      {
+        "id": "frequency_counting",
+        "name": "Frequency Counting",
+        "description": "Count how many times a specific event, word, or action occurs throughout the video",
+        "example": "How many times does the speaker say 'important'?"
+      },
+      {
+        "id": "text_extraction",
+        "name": "Text Extraction",
+        "description": "Read and extract text that appears visually in the video (signs, documents, screens, etc.)",
+        "example": "What does the sign on the door say?"
+      },
+      {
+        "id": "attribute_identification",
+        "name": "Attribute Identification",
+        "description": "Identify specific properties, characteristics, or attributes of objects, people, or brands shown",
+        "example": "What brand of laptop is the presenter using?"
+      }
+    ],
+    "temporal": [
+      {
+        "id": "timestamp_identification",
+        "name": "Timestamp Identification",
+        "description": "Locate when specific events occur in the video timeline",
+        "example": "At what time does the alarm start ringing?"
+      },
+      {
+        "id": "duration_calculation",
+        "name": "Duration Calculation",
+        "description": "Measure how long specific processes, events, or activities take",
+        "example": "How long does the cooking process take?"
+      },
+      {
+        "id": "sequence_ordering",
+        "name": "Sequence Ordering",
+        "description": "Determine the chronological order in which events or actions occur",
+        "example": "In what order did the three customers arrive?"
+      },
+      {
+        "id": "temporal_relationship",
+        "name": "Temporal Relationship",
+        "description": "Identify what happens in relation to specific events in time (before, after, during)",
+        "example": "What happens immediately after the door closes?"
+      }
+    ],
+    "spatial": [
+      {
+        "id": "location_identification",
+        "name": "Location Identification",
+        "description": "Identify where specific objects, people, or events are positioned in the visual space",
+        "example": "Where is the red book placed in the room?"
+      },
+      {
+        "id": "spatial_relationship",
+        "name": "Spatial Relationship",
+        "description": "Describe positional relationships between objects or people (left, right, above, behind, etc.)",
+        "example": "What is to the left of the window?"
+      },
+      {
+        "id": "movement_tracking",
+        "name": "Movement Tracking",
+        "description": "Track how objects or people move through space over time",
+        "example": "Where does the person go after leaving the kitchen?"
+      },
+      {
+        "id": "navigation_description",
+        "name": "Navigation Description",
+        "description": "Describe the routes, paths, or directions that people or objects take while moving",
+        "example": "What route does the delivery person take?"
+      }
+    ],
+    "descriptive": [
+      {
+        "id": "scene_description",
+        "name": "Scene Description",
+        "description": "Describe the overall environment, setting, or visual context of scenes",
+        "example": "What does the room look like at the beginning?"
+      },
+      {
+        "id": "action_description",
+        "name": "Action Description",
+        "description": "Describe what people are doing, their activities, or their interactions with objects",
+        "example": "What is the person doing with the tools?"
+      },
+      {
+        "id": "visual_appearance",
+        "name": "Visual Appearance",
+        "description": "Describe the physical attributes, clothing, or visual characteristics of people or objects",
+        "example": "What is the speaker wearing?"
+      },
+      {
+        "id": "audio_description",
+        "name": "Audio Description",
+        "description": "Describe sounds, music, background noise, or audio cues present in the video",
+        "example": "What sounds can be heard in the background?"
+      }
+    ],
+    "reasoning": [
+      {
+        "id": "causal_explanation",
+        "name": "Causal Explanation",
+        "description": "Explain why specific events occurred or what caused certain outcomes",
+        "example": "Why did the alarm go off?"
+      },
+      {
+        "id": "inference_making",
+        "name": "Inference Making",
+        "description": "Draw logical conclusions based on evidence presented in the video",
+        "example": "What can you infer about the speaker's expertise?"
+      },
+      {
+        "id": "prediction",
+        "name": "Prediction",
+        "description": "Anticipate likely outcomes or what might happen next based on current context",
+        "example": "What will likely happen next based on the setup?"
+      },
+      {
+        "id": "intention_analysis",
+        "name": "Intention Analysis",
+        "description": "Identify the motives, goals, or intentions behind people's actions",
+        "example": "What is the person trying to achieve?"
+      },
+      {
+        "id": "problem_identification",
+        "name": "Problem Identification",
+        "description": "Detect mistakes, issues, errors, or problems that occur in the video",
+        "example": "What mistake does the instructor make?"
+      },
+      {
+        "id": "counterfactual_reasoning",
+        "name": "Counterfactual Reasoning",
+        "description": "Reason about hypothetical scenarios and what would happen under different conditions",
+        "example": "If the ingredient were missing, what would happen in this context?"
+      }
+    ],
+    "comparative": [
+      {
+        "id": "difference_identification",
+        "name": "Difference Identification",
+        "description": "Identify contrasts, differences, or distinctions between multiple elements shown",
+        "example": "How do the two methods demonstrated differ?"
+      },
+      {
+        "id": "similarity_identification",
+        "name": "Similarity Identification",
+        "description": "Identify commonalities, shared characteristics, or similarities between elements",
+        "example": "What do all three examples have in common?"
+      },
+      {
+        "id": "change_analysis",
+        "name": "Change Analysis",
+        "description": "Track and analyze meaningful changes that occur over time in the video",
+        "example": "How does the speaker's tone change throughout? What changed in the room between the beginning and end?"
+      }
+    ],
+    "procedural": [
+      {
+        "id": "step_extraction",
+        "name": "Step Extraction",
+        "description": "List the individual steps, stages, or phases of processes shown or described",
+        "example": "What are the steps to complete the recipe?"
+      },
+      {
+        "id": "instruction_clarification",
+        "name": "Instruction Clarification",
+        "description": "Explain how specific processes, techniques, or procedures should be performed",
+        "example": "How does the instructor say to hold the tool?"
+      },
+      {
+        "id": "missing_step_identification",
+        "name": "Missing Step Identification",
+        "description": "Identify gaps, omissions, or missing parts in demonstrated processes",
+        "example": "What step did the presenter skip?"
+      }
+    ],
+    "synthesis": [
+      {
+        "id": "summary_generation",
+        "name": "Summary Generation",
+        "description": "Summarize the main content, key points, or overall message of the video",
+        "example": "What are the main points of the presentation?"
+      },
+      {
+        "id": "key_information_extraction",
+        "name": "Key Information Extraction",
+        "description": "Extract the most essential or important information from the video content",
+        "example": "What are the three key takeaways mentioned?"
+      },
+      {
+        "id": "narrative_construction",
+        "name": "Narrative Construction",
+        "description": "Construct a coherent story or narrative from the events and information presented",
+        "example": "What is the overall story being told?"
+      },
+      {
+        "id": "pattern_identification",
+        "name": "Pattern Identification",
+        "description": "Identify recurring themes, behaviors, or patterns that emerge throughout the video",
+        "example": "What pattern emerges in the customer interactions?"
+      },
+      {
+        "id": "long_horizon_integration",
+        "name": "Long Horizon Integration",
+        "description": "Connect and integrate events or information across distant points in the video timeline",
+        "example": "How does the presenter's attitude evolve across the entire session?"
+      }
+    ],
+    "multimodal": [
+      {
+        "id": "audio_visual_alignment",
+        "name": "Audio-Visual Alignment",
+        "description": "Verify consistency and alignment between what is heard and what is seen",
+        "example": "Does what the speaker says match what is shown?"
+      },
+      {
+        "id": "cross_modal_information",
+        "name": "Cross-Modal Information",
+        "description": "Combine information from multiple modalities (audio, visual, text) to answer questions",
+        "example": "What does the narrator say about the object shown at 1:23?"
+      },
+      {
+        "id": "modality_comparison",
+        "name": "Modality Comparison",
+        "description": "Compare and contrast information presented in different modalities",
+        "example": "How does the written instruction differ from the verbal explanation?"
+      },
+      {
+        "id": "complementary_information",
+        "name": "Complementary Information",
+        "description": "Integrate complementary information from multiple sources to form complete understanding",
+        "example": "Combining visual and audio cues, what is happening?"
+      }
+    ],
+    "analytical": [
+      {
+        "id": "error_detection",
+        "name": "Error Detection",
+        "description": "Identify mistakes, inconsistencies, or errors that occur in the video content",
+        "example": "What error occurs during the demonstration?"
+      },
+      {
+        "id": "quality_assessment",
+        "name": "Quality Assessment",
+        "description": "Evaluate the quality, clarity, effectiveness, or appropriateness of content presented",
+        "example": "What aspects of the presentation could be improved?"
+      },
+      {
+        "id": "consistency_check",
+        "name": "Consistency Check",
+        "description": "Check for logical, visual, or informational consistency throughout the video",
+        "example": "What inconsistency appears in the explanation?"
+      },
+      {
+        "id": "completeness_evaluation",
+        "name": "Completeness Evaluation",
+        "description": "Identify missing information, gaps, or incomplete elements in the content",
+        "example": "What important information is missing?"
+      }
+    ],
+    "complex_understanding": [
+      {
+        "id": "multi_hop_reasoning",
+        "name": "Multi-Hop Reasoning",
+        "description": "Link multiple pieces of information from different parts of the video to reach conclusions",
+        "example": "Based on what the first and third speakers say, what can you conclude?"
+      },
+      {
+        "id": "contextual_interpretation",
+        "name": "Contextual Interpretation",
+        "description": "Use broader situational context to interpret meaning beyond literal content",
+        "example": "Given the setting and tone, what is the real message?"
+      },
+      {
+        "id": "implicit_information",
+        "name": "Implicit Information",
+        "description": "Extract meaning, implications, or information that is suggested but not directly stated",
+        "example": "What is implied but not directly stated?"
+      },
+      {
+        "id": "holistic_understanding",
+        "name": "Holistic Understanding",
+        "description": "Provide a comprehensive, global interpretation of the entire video's purpose and meaning",
+        "example": "What is the overall purpose of this video?"
+      },
+      {
+        "id": "ambiguity_resolution",
+        "name": "Ambiguity Resolution",
+        "description": "Resolve unclear or ambiguous scenarios using available evidence and context",
+        "example": "Who is more likely addressing the audience when two people speak at once?"
+      }
+    ],
+    "interactive_agentic": [
+      {
+        "id": "tool_identification",
+        "name": "Tool Identification",
+        "description": "Identify what tools, resources, or instruments would be needed to accomplish tasks shown",
+        "example": "What tool would help accomplish the task shown?"
+      },
+      {
+        "id": "parameter_extraction",
+        "name": "Parameter Extraction",
+        "description": "Extract specific parameters, requirements, or information needed for tools or APIs",
+        "example": "What information would you need to book the appointment discussed?"
+      },
+      {
+        "id": "action_planning",
+        "name": "Action Planning",
+        "description": "Create a sequence of steps or actions needed to achieve goals described in the video",
+        "example": "What sequence of actions would achieve the goal described?"
+      },
+      {
+        "id": "information_gathering",
+        "name": "Information Gathering",
+        "description": "Identify what additional information would be needed to complete tasks or answer questions",
+        "example": "What additional information would help answer the customer's question?"
+      },
+      {
+        "id": "self_evaluation",
+        "name": "Self Evaluation",
+        "description": "Assess confidence levels, reasoning limits, or uncertainty about answers provided",
+        "example": "How confident are you in your answer and why?"
+      }
+    ]
+  }
+}

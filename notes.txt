@@ -38,7 +38,7 @@ cd ../eval
 bash generate.sh # to geenrate responses from candidate model
 bash eval.sh # to evaluate candidate responses
 
-TO DO
+====== TO DO ======
 > remove unwanted codes/comments
 > readme individual and full
 > remove hallucination?

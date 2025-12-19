@@ -1,0 +1,24 @@
+{
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "task_priority_schema",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "description": { "type": "string" },
+            "category": {
+              "type": "string",
+              "enum": ["high_priority", "medium_priority", "low_priority", "penalty"]
+            }
+          },
+          "required": ["name", "description", "category"]
+        },
+        "maxItems": 5
+      }
+    }
+  }
+}

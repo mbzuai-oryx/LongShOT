@@ -1,8 +1,10 @@
 *__MACOSX*
-# notes.txt
+notes.txt
 tmp/
 *__pycache__*
 *logs*
 preprocess/dataset/*
 datagen/results/*
 eval/results_*
+*.cache
+preprocess/MODELS/*

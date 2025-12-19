@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+
+{% block title %}Videos - Arabic Video Dataset{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">Video Library</h3>
+                <div class="btn-group">
+                    <a href="{{ url_for('main.videos', status='all') }}" 
+                       class="btn btn-outline-primary {{ 'active' if status == 'all' }}"
+                       aria-current="{{ 'page' if status == 'all' else 'false' }}">
+                       <i class="fas fa-film me-1" aria-hidden="true"></i> All Videos
+                    </a>
+                    <a href="{{ url_for('main.videos', status='downloaded') }}" 
+                       class="btn btn-outline-primary {{ 'active' if status == 'downloaded' }}"
+                       aria-current="{{ 'page' if status == 'downloaded' else 'false' }}">
+                       <i class="fas fa-download me-1" aria-hidden="true"></i> Downloaded
+                    </a>
+                    <a href="{{ url_for('main.videos', status='captioned') }}" 
+                       class="btn btn-outline-primary {{ 'active' if status == 'captioned' }}"
+                       aria-current="{{ 'page' if status == 'captioned' else 'false' }}">
+                       <i class="fas fa-tasks me-1" aria-hidden="true"></i> Ready to Verify
+                    </a>
+                    <a href="{{ url_for('main.videos', status='verified') }}" 
+                       class="btn btn-outline-primary {{ 'active' if status == 'verified' }}"
+                       aria-current="{{ 'page' if status == 'verified' else 'false' }}">
+                       <i class="fas fa-check-circle me-1" aria-hidden="true"></i> Completed
+                    </a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="p-3">
+                    <!-- Search form -->
+                    <form method="get" action="{{ url_for('main.videos') }}" class="row g-2 mb-4">
+                        <input type="hidden" name="status" value="{{ status }}">
+                        <div class="col-md-8">
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-search" aria-hidden="true"></i></span>
+                                <input type="text" name="q" class="form-control" placeholder="Search videos by title or channel" 
+                                       value="{{ search_query }}" aria-label="Search videos">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary flex-grow-1">Search</button>
+                                {% if search_query %}
+                                <a href="{{ url_for('main.videos', status=status) }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times" aria-hidden="true"></i> Clear
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </form>
+                    
+                    <!-- Search results indicator -->
+                    {% if search_query %}
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-info-circle me-2" aria-hidden="true"></i>
+                        Showing results for: <strong>{{ search_query }}</strong> 
+                        ({{ pagination.total }} {{ 'video' if pagination.total == 1 else 'videos' }} found)
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Video Grid -->
+                <div class="row p-3">
+                    {% for video in videos %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card h-100 video-card">
+                            <div class="video-thumbnail">
+                                <!-- Use different sizes for different device widths -->
+                                <img src="{{ url_for('main.thumbnail', video_id=video.video_id, size='small') }}" 
+                                     srcset="{{ url_for('main.thumbnail', video_id=video.video_id, size='small') }} 320w,
+                                             {{ url_for('main.thumbnail', video_id=video.video_id, size='medium') }} 640w,
+                                             {{ url_for('main.thumbnail', video_id=video.video_id, size='large') }} 1280w"
+                                     sizes="(max-width: 576px) 100vw, (max-width: 992px) 320px, 640px"
+                                     class="card-img-top" alt="{{ video.title }}" 
+                                     loading="lazy">
+                                <div class="duration">{{ video.duration // 60 }}:{{ '%02d' % (video.duration % 60) }}</div>
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title text-truncate" title="{{ video.title }}">{{ video.title }}</h5>
+                                <h6 class="card-subtitle mb-2 text-muted text-truncate">
+                                    <i class="fas fa-user-circle me-1" aria-hidden="true"></i>{{ video.channel or 'Unknown Channel' }}
+                                </h6>
+                                <div class="d-flex flex-wrap gap-2 mt-2 mb-3">
+                                    {% if video.status == 'downloaded' %}
+                                    <span class="badge rounded-pill bg-primary">
+                                        <i class="fas fa-download me-1" aria-hidden="true"></i>Downloaded
+                                    </span>
+                                    {% elif video.status == 'audio_extracted' %}
+                                    <span class="badge rounded-pill bg-info">
+                                        <i class="fas fa-volume-up me-1" aria-hidden="true"></i>Processing
+                                    </span>
+                                    {% elif video.status == 'captioned' %}
+                                    <span class="badge rounded-pill bg-warning">
+                                        <i class="fas fa-tasks me-1" aria-hidden="true"></i>Ready to Verify
+                                    </span>
+                                    {% elif video.status == 'verified' %}
+                                    <span class="badge rounded-pill bg-success">
+                                        <i class="fas fa-check-circle me-1" aria-hidden="true"></i>Completed
+                                    </span>
+                                    {% else %}
+                                    <span class="badge rounded-pill bg-secondary">
+                                        <i class="fas fa-clock me-1" aria-hidden="true"></i>{{ video.status|title }}
+                                    </span>
+                                    {% endif %}
+                                    {% if current_user.is_admin and video.id in assignments_by_video %}
+                                    <span class="badge rounded-pill bg-info" title="Assigned Users">
+                                        <i class="fas fa-users me-1"></i>{{ assignments_by_video[video.id]|length }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{{ url_for('main.video_detail', video_id=video.video_id) }}" 
+                                       class="btn btn-primary btn-sm"
+                                       aria-label="View details of '{{ video.title }}'">
+                                        <i class="fas fa-info-circle me-1" aria-hidden="true"></i>Details
+                                    </a>
+                                    {% if video.status == 'captioned' %}
+                                    <a href="{{ url_for('main.verify_caption', video_id=video.video_id) }}" 
+                                       class="btn btn-success btn-sm"
+                                       aria-label="Verify captions for '{{ video.title }}'">
+                                        <i class="fas fa-tasks me-1" aria-hidden="true"></i>Start Verifying
+                                    </a>
+                                    {% elif video.status == 'verified' %}
+                                    <a href="{{ url_for('main.verify_caption', video_id=video.video_id, source='verified') }}" 
+                                       class="btn btn-outline-secondary btn-sm"
+                                       aria-label="Edit verified captions for '{{ video.title }}'">
+                                        <i class="fas fa-edit me-1" aria-hidden="true"></i>Review
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Pagination -->
+                {% if pagination.pages > 1 %}
+                <div class="pagination-container p-3">
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center">
+                            {% if pagination.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.videos', status=status, page=pagination.prev_num, q=request.args.get('q', '')) }}" aria-label="Previous page">
+                                    <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                                    <span class="d-none d-sm-inline">Previous</span>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link" aria-hidden="true">
+                                    <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                                    <span class="d-none d-sm-inline">Previous</span>
+                                </span>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page_num in pagination.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num == pagination.page %}
+                                    <li class="page-item active" aria-current="page">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('main.videos', status=status, page=page_num, q=request.args.get('q', '')) }}">{{ page_num }}</a>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                    <li class="page-item disabled d-none d-sm-block">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if pagination.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.videos', status=status, page=pagination.next_num, q=request.args.get('q', '')) }}" aria-label="Next page">
+                                    <span class="d-none d-sm-inline">Next</span>
+                                    <i class="fas fa-chevron-right ms-1" aria-hidden="true"></i>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link" aria-hidden="true">
+                                    <span class="d-none d-sm-inline">Next</span>
+                                    <i class="fas fa-chevron-right ms-1" aria-hidden="true"></i>
+                                </span>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- No results message -->
+{% if videos|length == 0 %}
+<div class="alert alert-info mt-4">
+    <i class="fas fa-info-circle me-2" aria-hidden="true"></i>
+    No videos found. {% if request.args.get('q') %}Try a different search term or filter.{% else %}Please check back later.{% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .video-card {
+        transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+        border-radius: var(--border-radius);
+    }
+    
+    .video-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .video-thumbnail {
+        position: relative;
+        height: 140px;
+        overflow: hidden;
+        border-top-left-radius: var(--border-radius);
+        border-top-right-radius: var(--border-radius);
+    }
+    
+    .video-thumbnail img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .placeholder-thumbnail {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .duration {
+        position: absolute;
+        bottom: 0.5rem;
+        right: 0.5rem;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 0.2rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.8rem;
+    }
+    
+    .video-status-badges {
+        min-height: 24px;
+    }
+    
+    @media (max-width: 768px) {
+        .btn-group {
+            flex-wrap: wrap;
+        }
+        
+        .btn-group .btn {
+            flex: 1 0 auto;
+            margin-bottom: 0.25rem;
+        }
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,121 @@
+You are an expert in video understanding evaluation. Your task is to analyze evaluation scenarios and map each scenario-task combination to the most appropriate question types for comprehensive testing.
+
+Your Task:
+
+1. Review the provided video metadata for context
+2. Analyze the given scenario and ALL its assigned tasks
+3. For each task, select the most relevant question type IDs from the comprehensive list below
+4. Generate a MAXIMUM of 3 question types per task
+5. Ensure diversity of question types across all tasks in the scenario
+6. Return only the question type IDs (e.g., "direct_fact", "causal_explanation") - no descriptions needed
+
+Input:
+Video Metadata (for context):
+{video_metadata}
+
+Scenario with Tasks:
+{scenario_with_tasks}
+
+COMPREHENSIVE QUESTION TYPE CATALOG
+
+Factual Retrieval Questions:
+- direct_fact: Extract specific information ("What did the coach tell them to focus on?")
+- numerical_extraction: Count or measure ("How many people entered the room during the meeting?")
+- frequency_counting: Count event repetitions ("How many times did they try the experiment?")
+- text_extraction: Read text from video ("What does the sign on the door say?")
+- attribute_identification: Identify properties ("What equipment were they using for the demonstration?")
+
+Temporal Questions:
+- timestamp_identification: Locate events in time ("At what time does the alarm start ringing?")
+- duration_calculation: Measure time spans ("How long does the cooking process take?")
+- sequence_ordering: Order events based on occurrence ("In what order did the three customers arrive?")
+- temporal_relationship: Relate events in time ("What happens immediately after the door closes?")
+
+Spatial Questions:
+- location_identification: Identify object/person location ("Where is the red book placed in the room?")
+- spatial_relationship: Describe positional relationships ("What is to the left of the window?")
+- movement_tracking: Track motion over time ("Where does the person go after leaving the kitchen?")
+- navigation_description: Describe movement routes ("What route does the delivery person take?")
+
+Descriptive Questions:
+- scene_description: Describe the environment ("What does the room look like at the beginning?")
+- action_description: Describe activities ("What is the person doing with the tools?")
+- visual_appearance: Describe physical attributes ("What is the speaker wearing?")
+- audio_description: Describe audio cues ("What sounds can be heard in the background?")
+
+Reasoning Questions:
+- causal_explanation: Explain why something occurred ("Why did the alarm go off?")
+- inference_making: Draw logical conclusions ("What can you infer about the speaker's expertise?")
+- prediction: Anticipate likely outcomes ("What will likely happen next based on the setup?")
+- intention_analysis: Identify motives/goals ("What is the person trying to achieve?")
+- problem_identification: Detect issues/errors ("What mistake does the instructor make?")
+- counterfactual_reasoning: Hypothetical scenario reasoning ("If the ingredient were missing, what would happen in this context?")
+
+Comparative Questions:
+- difference_identification: Identify contrasts ("How do the two methods demonstrated differ?")
+- similarity_identification: Identify commonalities ("What do all three examples have in common?")
+- change_analysis: Track meaningful differences over time ("How does the speaker's tone change throughout?")
+
+Procedural Questions:
+- step_extraction: List observed or described steps ("What are the steps to complete the recipe?")
+- instruction_clarification: Explain an observed process ("How does the instructor say to hold the tool?")
+- missing_step_identification: Identify missing parts of a process ("What step did the presenter skip?")
+
+Synthesis Questions:
+- summary_generation: Summarize main content ("What are the main points of the presentation?")
+- key_information_extraction: Extract the essentials ("What are the three key takeaways mentioned?")
+- narrative_construction: Construct a coherent story from events ("What is the overall story being told?")
+- pattern_identification: Identify recurring themes or behaviors ("What pattern emerges in the customer interactions?")
+- long_horizon_integration: Connect events across distant timestamps ("How does the presenter's attitude evolve across the entire session?")
+
+Multimodal Questions:
+- audio_visual_alignment: Verify audio-video consistency ("Does what the speaker says match what is shown?")
+- cross_modal_information: Combine modalities to answer ("What does the narrator say about the object shown at 1:23?")
+- modality_comparison: Compare different modality content ("How does the written instruction differ from the verbal explanation?")
+- complementary_information: Integrate information from multiple modalities ("Combining visual and audio cues, what is happening?")
+
+Analytical Questions:
+- error_detection: Identify mistakes or inconsistencies ("What error occurs during the demonstration?")
+- quality_assessment: Evaluate quality or clarity ("What aspects of the presentation could be improved?")
+- consistency_check: Check for logical/visual consistency ("What inconsistency appears in the explanation?")
+- completeness_evaluation: Identify missing but necessary details ("What important information is missing?")
+
+Complex Understanding Questions:
+- multi_hop_reasoning: Link multiple pieces of information ("Based on what the first and third speakers say, what can you conclude?")
+- contextual_interpretation: Use broader situational context ("Given the setting and tone, what is the real message?")
+- implicit_information: Extract meaning not directly stated ("What is implied but not directly stated?")
+- holistic_understanding: Provide a global interpretation ("What is the overall purpose of this video?")
+- ambiguity_resolution: Resolve unclear scenarios using evidence ("Who is more likely addressing the audience when two people speak at once?")
+
+MAPPING GUIDELINES:
+
+1. Match question types to task requirements:
+   - Entity recognition tasks → direct_fact, attribute_identification, visual_appearance
+   - Temporal reasoning tasks → timestamp_identification, duration_calculation, sequence_ordering
+   - Spatial reasoning tasks → location_identification, spatial_relationship, movement_tracking
+   - Audio understanding tasks → audio_description, cross_modal_information
+   - Reasoning tasks → causal_explanation, inference_making, multi_hop_reasoning
+
+2. Selection criteria:
+   - Choose exactly 1-3 most relevant question types per task
+   - Focus on question types that directly test the task capability
+   - Ensure diversity across all tasks in the scenario - avoid repeating question types
+   - Include a mix of basic and complex types where appropriate
+   - Ensure multimodal integration where applicable to the task
+
+Output format (strict JSON):
+{
+  "scenario": "scenario description",
+  "tasks": [
+    {
+      "task": "task_name",
+      "question_types": [
+        "direct_fact",
+        "causal_explanation",
+        "inference_making"
+      ]
+    }
+  ]
+}
+
+Your goal is to create comprehensive question type mappings that will enable systematic and thorough evaluation of AI video understanding capabilities across all relevant dimensions for each scenario-task combination.

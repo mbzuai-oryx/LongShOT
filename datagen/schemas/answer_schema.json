@@ -1,0 +1,27 @@
+{
+  "response_format": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "video_benchmark_answer_output",
+      "schema": {
+        "title": "Video Benchmark Answer Output",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "question": {
+              "type": "string",
+              "description": "Exact question text from the conversation"
+            },
+            "answer": {
+              "type": "string",
+              "description": "Precise, grounded answer strictly based on provided metadata"
+            }
+          },
+          "required": ["question", "answer"],
+          "additionalProperties": false
+        }
+      }
+    }
+  }
+}

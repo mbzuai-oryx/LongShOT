@@ -1,0 +1,306 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ video.title }} - Arabic Video Dataset{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Video Column -->
+    <div class="col-lg-8">
+        <div class="card mb-4 shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Video Player</h4>
+            </div>
+            <div class="card-body">
+                <div class="ratio ratio-16x9 mb-3">
+                    <video controls class="rounded">
+                        <source src="{{ url_for('main.video_file', video_id=video.video_id) }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                <h3>{{ video.title }}</h3>
+                <h6 class="text-muted">{{ video.channel }}</h6>
+                <div class="d-flex mb-3">
+                    <span class="badge bg-secondary me-2">{{ video.duration // 60 }}:{{ '%02d' % (video.duration % 60) }}</span>
+                    {% if video.status == 'downloaded' %}
+                    <span class="badge bg-primary">Downloaded</span>
+                    {% elif video.status == 'audio_extracted' %}
+                    <span class="badge bg-info">Processing</span>
+                    {% elif video.status == 'captioned' %}
+                    <span class="badge bg-warning">Ready to Verify</span>
+                    {% elif video.status == 'verified' %}
+                    <span class="badge bg-success">Completed</span>
+                    {% else %}
+                    <span class="badge bg-secondary">{{ video.status|title }}</span>
+                    {% endif %}
+                </div>
+                
+                {% if video.description %}
+                <div class="card mb-3">
+                    <div class="card-header">Description</div>
+                    <div class="card-body">
+                        <p class="mb-0">{{ video.description }}</p>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if video.status == 'captioned' or not is_verified %}
+                <a href="{{ url_for('main.verify_caption', video_id=video.video_id) }}" class="btn btn-success">
+                    <i class="fas fa-check-circle me-1"></i>Start Verification
+                </a>
+                {% elif is_verified %}
+                <div class="btn-group">
+                    <a href="{{ url_for('main.verify_caption', video_id=video.video_id) }}" class="btn btn-outline-success">
+                        <i class="fas fa-sync-alt me-1"></i>Review Captions
+                    </a>
+                    <a href="{{ url_for('main.video_detail', video_id=video.video_id, show_original='true' if not show_original else 'false') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-exchange-alt me-1"></i>Compare Versions
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if current_user.is_admin %}
+        <!-- Video Assignments (Admin Only) -->
+        <div class="card mb-4 shadow">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0"><i class="fas fa-users me-2"></i>Assigned Users</h4>
+                <div class="btn-group">
+                    <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#assignModal">
+                        <i class="fas fa-plus me-1"></i>Assign User
+                    </button>
+                    <button class="btn btn-outline-light btn-sm bulk-unassign-btn" disabled>
+                        <i class="fas fa-user-minus me-1"></i>Unassign Selected
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if assignments %}
+                <div class="list-group">
+                    {% for assignment in assignments %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div class="form-check d-flex align-items-center">
+                            <input class="form-check-input assignment-select" type="checkbox" 
+                                   value="{{ assignment.user_id }}" id="assignment-{{ assignment.user_id }}">
+                            <label class="form-check-label ms-2" for="assignment-{{ assignment.user_id }}">
+                                <div>
+                                    <h6 class="mb-0">{{ assignment.user.username }}</h6>
+                                    <small class="text-muted">Assigned {{ assignment.assigned_at.strftime('%Y-%m-%d') }}</small>
+                                </div>
+                            </label>
+                        </div>
+                        <form action="{{ url_for('main.unassign_video', video_id=video.video_id) }}" method="POST" class="d-inline">
+                            <input type="hidden" name="user_id" value="{{ assignment.user_id }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm" 
+                                    onclick="return confirm('Are you sure you want to unassign {{ assignment.user.username }}?')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+                <form id="bulk-unassign-form" action="{{ url_for('api.bulk_unassign', video_id=video.video_id) }}" 
+                      method="POST" data-ajax="true" class="mt-3" style="display: none;">
+                    <input type="hidden" name="selected_users" id="selected-users-input">
+                </form>
+                {% else %}
+                <p class="text-muted mb-0">No users assigned to this video.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Assignment Modal -->
+        <div class="modal fade" id="assignModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Assign Video to User</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form action="{{ url_for('main.assign_video', video_id=video.video_id) }}" 
+                          method="POST" 
+                          data-ajax="true"
+                          data-video-id="{{ video.video_id }}">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="user_id" class="form-label">Select User</label>
+                                <select class="form-select" id="user_id" name="user_id" required>
+                                    <option value="">Choose a user...</option>
+                                    {% for user in users %}
+                                    <option value="{{ user.id }}">{{ user.username }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Assign</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Caption Column -->
+    <div class="col-lg-4">
+        <div class="card mb-4 shadow">
+            <div class="card-header {% if is_verified %}bg-success{% else %}bg-primary{% endif %} text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        {% if is_verified %}
+                            <i class="fas fa-check-circle me-1"></i> Verified Captions
+                        {% else %}
+                            <i class="fas fa-robot me-1"></i> Auto-Generated Captions
+                        {% endif %}
+                    </h4>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if caption_data %}
+                <div class="caption-container">
+                    {% if is_verified %}
+                    <div class="alert alert-success mb-3">
+                        <i class="fas fa-check-circle me-2"></i> These captions have been checked and approved by {{ verifications[0].user.username }} on {{ verifications[0].created_at.strftime('%Y-%m-%d') }}.
+                        {% if verifications[0].verification_notes %}
+                        <hr>
+                        <strong>Notes:</strong> {{ verifications[0].verification_notes }}
+                        {% endif %}
+                    </div>
+                    {% elif show_original and has_verified_caption %}
+                    <div class="alert alert-warning mb-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i> You are viewing the original computer-generated captions. <a href="{{ url_for('main.video_detail', video_id=video.video_id, show_original='false') }}" class="alert-link">Click here</a> to view the verified captions.
+                    </div>
+                    {% endif %}
+                    
+                    {% if caption_data and caption_data.transcript and caption_data.transcript.segments %}
+                        {% for segment in caption_data.transcript.segments %}
+                        <div class="caption-segment mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="text-muted">
+                                    {% if segment.start is not none and segment.end is not none %}
+                                    {{ '%02d:%02d' % (segment.start // 60, segment.start % 60) }} - {{ '%02d:%02d' % (segment.end // 60, segment.end % 60) }}
+                                    {% else %}
+                                    --:-- - --:--
+                                    {% endif %}
+                                </small>
+                                <button class="btn btn-sm btn-outline-secondary play-segment-btn" data-start="{{ segment.start or 0 }}">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                            </div>
+                            <p class="mb-0" dir="rtl">{{ segment.text }}</p>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i> The caption data is in an unexpected format.
+                        </div>
+                    {% endif %}
+                </div>
+                {% elif verifications and verifications|length > 0 %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i> This video has been verified but the caption text is not available. Please contact support.
+                </div>
+                {% else %}
+                <p class="text-muted">No captions available for this video yet.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if verifications %}
+        <div class="card mb-4 shadow">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0"><i class="fas fa-history me-2"></i>Verification History</h4>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for verification in verifications %}
+                    <div class="list-group-item {% if loop.first %}bg-light{% endif %}">
+                        <div class="d-flex justify-content-between">
+                            <h6 class="mb-1">{{ verification.user.username }} {% if loop.first %}<span class="badge bg-success">Latest</span>{% endif %}</h6>
+                            <small data-utc-date="{{ verification.created_at.isoformat() }}" data-date-format="YYYY-MM-DD HH:MM"></small>
+                        </div>
+                        {% if verification.verification_notes %}
+                        <p class="mb-1">{{ verification.verification_notes }}</p>
+                        {% endif %}
+                        <small class="text-muted">Time spent: {{ '%.1f'|format(verification.verification_time|default(0) / 60) if verification.verification_time else 0 }} minutes</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get video element
+        const videoElement = document.querySelector('video');
+        
+        // Add click event to play segment buttons
+        document.querySelectorAll('.play-segment-btn').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const startTime = parseFloat(this.getAttribute('data-start'));
+                
+                // Set video current time and play
+                if (videoElement) {
+                    videoElement.currentTime = startTime;
+                    videoElement.play();
+                }
+            });
+        });
+
+        // Assignment checkboxes handling
+        const assignmentCheckboxes = document.querySelectorAll('.assignment-select');
+        const bulkUnassignBtn = document.querySelector('.bulk-unassign-btn');
+        const selectedUsersInput = document.getElementById('selected-users-input');
+        const bulkUnassignForm = document.getElementById('bulk-unassign-form');
+        
+        if (assignmentCheckboxes.length > 0 && bulkUnassignBtn) {
+            // Update selected state
+            function updateSelectedState() {
+                const selectedCheckboxes = Array.from(document.querySelectorAll('.assignment-select:checked'));
+                const selectedCount = selectedCheckboxes.length;
+                
+                if (selectedCount > 0) {
+                    bulkUnassignBtn.textContent = `Unassign ${selectedCount} User${selectedCount !== 1 ? 's' : ''}`;
+                    bulkUnassignBtn.disabled = false;
+                } else {
+                    bulkUnassignBtn.innerHTML = '<i class="fas fa-user-minus me-1"></i>Unassign Selected';
+                    bulkUnassignBtn.disabled = true;
+                }
+                
+                // Update the hidden input with selected user IDs
+                const selectedUserIds = selectedCheckboxes.map(cb => cb.value).join(',');
+                if (selectedUsersInput) {
+                    selectedUsersInput.value = selectedUserIds;
+                }
+            }
+            
+            // Add event listeners to checkboxes
+            assignmentCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', updateSelectedState);
+            });
+            
+            // Add event listener for bulk unassign button
+            if (bulkUnassignBtn) {
+                bulkUnassignBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const selectedCount = document.querySelectorAll('.assignment-select:checked').length;
+                    if (selectedCount === 0) return;
+                    
+                    if (confirm(`Are you sure you want to unassign ${selectedCount} user${selectedCount !== 1 ? 's' : ''}?`)) {
+                        bulkUnassignForm.style.display = 'block';
+                        bulkUnassignForm.submit();
+                    }
+                });
+            }
+        }
+    });
+</script>
+{% endblock %}
