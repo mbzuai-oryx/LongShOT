@@ -39,7 +39,6 @@ for model in "${MODELS[@]:0:$NUM_MODELS}"; do
         --score true \
         --output_dir $OUTPUT_DIR \
         --tensor_parallel_size $TENSORS \
-        --hallucination-test "none" \
         --external-server \
         --config-file config.yaml \
         --eval_model "$EVAL_MODEL"

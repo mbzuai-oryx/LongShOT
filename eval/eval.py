@@ -42,7 +42,6 @@ def main():
     parser.add_argument('--eval_model', type=str, default='Qwen/Qwen3-14B', help='Model name for evaluation')
     parser.add_argument('--tensor_parallel_size', type=str, default=1, help='Tensor parallel size for vllm server')
     parser.add_argument('--external-server', action='store_true', help='Use external vLLM server (do not start/stop server automatically)')
-    parser.add_argument('--hallucination-test', type=str, default='none', choices=['none', 'no_video', 'with_notice', 'both'], help='Enable hallucination testing: none (default), no_video (question only), with_notice (question + notice about missing video), both (run both tests)')
     parser.add_argument('--tool', action='store_true', help='Enable tool calling mode for agentic tasks')
     args = parser.parse_args()
 
@@ -101,24 +100,15 @@ def main():
         eval_path = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}{suffix}_eval.jsonl")
         return output, eval_path
     
-    # Determine which tests to run - separate normal and hallucination tests
+    # Determine which tests to run - separate normal
     normal_tests = []
-    hallucination_tests = []
     
     # Always include normal tests when generate is enabled or when evaluating/scoring existing results
     if args.generate or args.evaluate or args.score:
         normal_tests = [""]
     
-    # Add hallucination tests based on the argument
-    if args.hallucination_test == 'no_video':
-        hallucination_tests = ["no_video"]
-    elif args.hallucination_test == 'with_notice':
-        hallucination_tests = ["with_notice"]
-    elif args.hallucination_test == 'both':
-        hallucination_tests = ["no_video", "with_notice"]
-    
     # Combine for compatibility with existing code
-    test_types = normal_tests + hallucination_tests
+    test_types = normal_tests
     
     timing_file = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}_timing.json")
     
@@ -161,7 +151,7 @@ def main():
             candidate_server, candidate_log_file = start_vllm(model_name, args.tensor_parallel_size, "candidate", config)
         server_setup_time = time.time() - server_start_time
         
-        # Process normal tests first, then hallucination tests
+        # Process normal tests
         inference_start_time = time.time()
         
         # First process normal tests
@@ -193,37 +183,7 @@ def main():
                     futures = [executor.submit(worker_func, sample) for sample in current_samples]
                     for _ in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"{test_type or 'normal'} test"):
                         pass
-        
-        # Then process hallucination tests after normal tests are complete
-        for test_type in hallucination_tests:
-            output_file, _ = get_file_paths(test_type)
-            
-            # Load already processed samples for this test type
-            completed_ids = set()
-            if os.path.exists(output_file):
-                with open(output_file, 'r') as f:
-                    for line in f:
-                        data = json.loads(line)
-                        completed_ids.add(data.get("sample_id"))
-            
-            # Filter samples for this test type
-            current_samples = [s for s in test_samples if s.get("sample_id") not in completed_ids]
-            if not current_samples:
-                continue
-                
-            print(f"Processing {len(current_samples)} samples for {test_type} hallucination test...")
-            
-            if args.num_workers <= 1:
-                for sample in tqdm(current_samples, desc=f"{test_type} hallucination test"):
-                    process_sample(sample, output_file, model_name, config, tool_mode=args.tool)
-            else:
-                from functools import partial
-                worker_func = partial(process_sample, output_file=output_file, model_name=model_name, config=config, tool_mode=args.tool)
-                with concurrent.futures.ProcessPoolExecutor(max_workers=args.num_workers) as executor:
-                    futures = [executor.submit(worker_func, sample) for sample in current_samples]
-                    for _ in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"{test_type} hallucination test"):
-                        pass
-                        
+               
         inference_end_time = time.time()
 
         # Clean up server
@@ -256,7 +216,7 @@ def main():
         
         # Check if there are any samples to evaluate before starting server
         has_samples_to_evaluate = False
-        for test_type in normal_tests + hallucination_tests:
+        for test_type in normal_tests:
             output_file, eval_file = get_file_paths(test_type)
             if os.path.exists(output_file):
                 responses = load_jsonl(output_file)
@@ -281,7 +241,7 @@ def main():
         else:
             eval_server_setup_time = time.time() - eval_server_start_time
 
-        # Process normal tests first, then hallucination tests
+        # Process normal tests
         eval_inference_start_time = time.time()
         total_evaluated = 0
         
@@ -322,45 +282,6 @@ def main():
                 with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
                     futures = [executor.submit(eval_worker_func, sample) for sample in responses]
                     for f in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"Evaluating {test_type or 'normal'}"):
-                        f.result()
-        
-        # Then process hallucination test evaluations after normal tests are complete
-        for test_type in hallucination_tests:
-            output_file, eval_file = get_file_paths(test_type)
-            
-            if not os.path.exists(output_file):
-                print(f"Warning: Output file {output_file} not found, skipping evaluation for {test_type} hallucination test")
-                continue
-                
-            responses = load_jsonl(output_file)
-            print(f"Evaluating {test_type} hallucination test using model: {eval_model}")
-            
-            # Load already evaluated samples
-            evaluated_ids = set()
-            if os.path.exists(eval_file):
-                with open(eval_file, 'r') as f:
-                    for line in f:
-                        if line.strip():
-                            data = json.loads(line)
-                            evaluated_ids.add(data.get("sample_id"))
-            
-            # Filter samples
-            responses = [sample for sample in responses if sample.get("sample_id") not in evaluated_ids]
-            if not responses:
-                continue
-                
-            print(f"Evaluating {len(responses)} {test_type} hallucination responses...")
-            total_evaluated += len(responses)
-            
-            if args.num_workers <= 1:
-                for sample in tqdm(responses, desc=f"Evaluating {test_type} hallucination"):
-                    process_video_evaluation(sample, eval_file, eval_model, config)
-            else:
-                from functools import partial
-                eval_worker_func = partial(process_video_evaluation, eval_file=eval_file, eval_model=eval_model, config=config)
-                with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
-                    futures = [executor.submit(eval_worker_func, sample) for sample in responses]
-                    for f in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"Evaluating {test_type} hallucination"):
                         f.result()
                         
         eval_inference_end_time = time.time()

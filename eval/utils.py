@@ -220,11 +220,6 @@ def evaluate_candidate_response(sample, eval_model="Qwen/Qwen3-14B", config=None
         from tool_handler import evaluate_tool_calling_response
         return evaluate_tool_calling_response(sample, eval_model, config, eval_file_path)
 
-    # Check if this is a hallucination test
-    from hal_test import is_hallucination_test, evaluate_hallucination_response
-    if is_hallucination_test(eval_file_path):
-        return evaluate_hallucination_response(sample, eval_model, config, eval_file_path)
-
     # Use original ground truth evaluation for all evaluation models
     json_schema = {
         "type": "object",
@@ -320,7 +315,7 @@ Instructions:
 
 
 def process_sample(sample, output_file, model_name, config=None, tool_mode=False):
-    """Process a single sample - handles normal, hallucination, and tool calling tests"""
+    """Process a single sample - handles normal, and tool calling tests"""
     # Check if this is a tool calling task
     if tool_mode or is_tool_calling_task(sample):
         response = generate_tool_calling_response(sample, model_name, config)

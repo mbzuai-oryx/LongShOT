@@ -30,8 +30,6 @@ if [[ -n "$NUM_MODELS" ]]; then
     MODELS=("${MODELS[@]:0:$NUM_MODELS}")
 fi
 
-HALLUCINATION_TEST="none"  # Options: none, no_video, with_notice, both
-
 # Set number of models to process
 NUM_MODELS=${1:-${#MODELS[@]}}
 
@@ -46,7 +44,6 @@ for model_config in "${MODELS[@]:0:$NUM_MODELS}"; do
         --generate true \
         --output_dir $OUTPUT_DIR \
         --tensor_parallel_size $tensor_size \
-        --hallucination-test "none" \
         --config-file config.yaml \
         --tool \
         --external-server
@@ -65,7 +62,6 @@ done
 #         --score true \
 #         --output_dir $OUTPUT_DIR \
 #         --tensor_parallel_size $tensor_size \
-#         --hallucination-test "none" \
 #         --config-file config_2.yaml \
 #         --tool 
 # done

@@ -28,7 +28,6 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, test_typ
     score_file = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}_score.txt")
     timing_file = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}_timing.json")
     normal_results = []
-    hallucination_results = []
     
     for test_type in test_types:
         _, eval_file = get_file_paths(test_type)
@@ -71,16 +70,10 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, test_typ
                 task_accuracies[task_type] = 0.0
         
         # Store results
-        if is_hallucination_test(eval_file):
-            hallucination_results.append({
-                'test_type': test_type,
-                'task_accuracies': task_accuracies
-            })
-        else:
-            normal_results.append({
-                'test_type': test_type, 
-                'task_accuracies': task_accuracies
-            })
+        normal_results.append({
+            'test_type': test_type, 
+            'task_accuracies': task_accuracies
+        })
     
     # Append consolidated results
     with open(score_file, 'a') as f:
@@ -105,31 +98,6 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, test_typ
             if all_accuracies:
                 overall_accuracy = sum(all_accuracies) / len(all_accuracies)
                 f.write(f"{task_index:2d}  {'Overall':>20}  {overall_accuracy:.6f}       {overall_accuracy*100:5.2f}%\n\n")
-        
-        # Hallucination results section with columns for each test type
-        if hallucination_results:
-            f.write("Hallucination Test Results:\n")
-            f.write("(Higher score = More Hallucination)\n")
-            f.write("                    Task  No Video (%)  With Notice (%)\n")
-            
-            # Organize hallucination data by task
-            hal_data = {}
-            for result in hallucination_results:
-                test_type = result['test_type']
-                for task, accuracy in result['task_accuracies'].items():
-                    if task not in hal_data:
-                        hal_data[task] = {}
-                    hal_data[task][test_type] = accuracy
-            
-            hal_task_index = 0
-            for task, scores in hal_data.items():
-                no_video_score = scores.get('no_video', 0) * 100
-                with_notice_score = scores.get('with_notice', 0) * 100
-                
-                f.write(f"{hal_task_index:2d}  {task:>20}  {no_video_score:8.2f}%    {with_notice_score:10.2f}%\n")
-                hal_task_index += 1
-            
-            f.write("\n")
     
     # Display results  
     print("\n" + "="*50)
@@ -151,27 +119,6 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, test_typ
             overall_accuracy = sum(all_accuracies) / len(all_accuracies)
             print(f"{task_index:2d}  {'Overall':>20}  {overall_accuracy:.6f}       {overall_accuracy*100:5.2f}%")
     
-    if hallucination_results:
-        print("\nHALLUCINATION TEST RESULTS:")
-        print("(Higher score = More Hallucination)")
-        print("                    Task  No Video (%)  With Notice (%)")
-        
-        # Organize hallucination data by task
-        hal_data = {}
-        for result in hallucination_results:
-            test_type = result['test_type']
-            for task, accuracy in result['task_accuracies'].items():
-                if task not in hal_data:
-                    hal_data[task] = {}
-                hal_data[task][test_type] = accuracy
-        
-        hal_task_index = 0
-        for task, scores in hal_data.items():
-            no_video_score = scores.get('no_video', 0) * 100
-            with_notice_score = scores.get('with_notice', 0) * 100
-            
-            print(f"{hal_task_index:2d}  {task:>20}  {no_video_score:8.2f}%    {with_notice_score:10.2f}%")
-            hal_task_index += 1
     print("="*50)
 
     scoring_end_time = time.time()
