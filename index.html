@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LongShOT - Long Video Understanding Benchmark</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --text-color: #333;
+            --bg-color: #fff;
+            --code-bg: #f4f4f4;
+            --border-color: #ddd;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background: var(--bg-color);
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto 20px;
+        }
+
+        .badges {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .badges a img {
+            height: 22px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .authors {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #666;
+        }
+
+        .authors .names {
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+        }
+
+        .authors .affiliation {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        h2 {
+            color: var(--primary-color);
+            margin: 40px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--accent-color);
+        }
+
+        h3 {
+            color: var(--primary-color);
+            margin: 25px 0 15px;
+        }
+
+        p {
+            margin-bottom: 15px;
+        }
+
+        .figure {
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .figure img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .figure figcaption {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: #666;
+            font-style: italic;
+        }
+
+        pre {
+            background: var(--code-bg);
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+            border: 1px solid var(--border-color);
+        }
+
+        code {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+        }
+
+        .inline-code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        ul, ol {
+            margin: 15px 0 15px 30px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .toc {
+            background: var(--code-bg);
+            padding: 20px 30px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+
+        .toc h3 {
+            margin-top: 0;
+        }
+
+        .toc ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .toc li {
+            margin: 8px 0;
+        }
+
+        .toc a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+
+        a {
+            color: var(--accent-color);
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px;
+            background: var(--code-bg);
+            margin-top: 60px;
+            color: #666;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            .header .subtitle {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>LongShOT</h1>
+        <p class="subtitle">A Benchmark and Agentic Framework for Omni-Modal Reasoning and Tool Use in Long Videos</p>
+        <div class="badges">
+            <a href="https://github.com/mbzuai-oryx/longshot"><img src="https://img.shields.io/badge/Project-Website-87CEEB" alt="Website"></a>
+            <a href="https://arxiv.org/abs/2412.07769"><img src="https://img.shields.io/badge/arXiv-Paper-red.svg" alt="Paper"></a>
+            <a href="https://huggingface.co/collections/MBZUAI/longshot_bench"><img src="https://img.shields.io/badge/HuggingFace-Dataset-F9D371" alt="HuggingFace"></a>
+            <a href="https://github.com/mbzuai-oryx/BiMediX/blob/main/LICENSE.txt"><img src="https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey" alt="License"></a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="authors">
+            <p class="names">
+                Mohammed Irfan K*, Jaseel Muhammad Kaithakkodan*, Jinxing Zhou, Sahal Shaji Mullappilly,
+                Mohammad Almansoori, Noor Ahsan, Beknur Kalmakhanbet, Sambal Shikhar, Rishabh Lalla,
+                Jean Lahoud, Mariette Awad, Fahad Shahbaz Khan, Salman Khan, Rao Muhammad Anwer, and Hisham Cholakkal
+            </p>
+            <p><em>*Equally contributing first authors</em></p>
+            <p class="affiliation">Mohamed Bin Zayed University of Artificial Intelligence (MBZUAI), UAE</p>
+        </div>
+
+        <nav class="toc">
+            <h3>Table of Contents</h3>
+            <ul>
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#installation">Installation</a></li>
+                <li><a href="#preprocessing">Data Preprocessing</a></li>
+                <li><a href="#dataset-generation">Dataset Generation</a></li>
+                <li><a href="#evaluation">Evaluation</a></li>
+            </ul>
+        </nav>
+
+        <section id="overview">
+            <h2>Overview</h2>
+            <p>
+                LongShOT introduces a diagnostic benchmark and agentic framework for long-form multimodal video understanding.
+                <strong>LongShOTBench</strong> features open-ended questions, multi-turn dialogues, and tasks requiring vision,
+                speech, and audio reasoning with tool use. Each sample includes reference answers and graded rubrics for
+                interpretable evaluation.
+            </p>
+            <p>
+                <strong>LongShOTAgent</strong> employs preprocessing, search, and iterative refinement to analyze long videos.
+                Current state-of-the-art models show significant gaps: Gemini-2.5-Flash achieves 52.95%, open-source models
+                remain below 30%, and LongShOTAgent attains 44.66%, highlighting the challenge of real-world long video understanding.
+            </p>
+
+            <figure class="figure">
+                <img src="assets/generation_pipeline_overview.png" alt="Generation Pipeline Overview">
+                <figcaption>
+                    <strong>Figure 1:</strong> Construction pipeline of LongShOTBench. The pipeline begins with raw video data
+                    where speech, visuals, and audio cues are extracted. These are passed into multimodal processing to generate
+                    segment-wise aligned and fused metadata. Only the distilled information flows to question design, where scenarios
+                    and question types are mapped, followed by the generation of questions and conversational answers. Next,
+                    verifiable rubrics are created to evaluate correctness and difficulty. Finally, the core dataset, comprising
+                    Q&A pairs and tailored evaluation rubrics, is manually reviewed and corrected by human validators, ensuring
+                    a clean, reliable benchmark.
+                </figcaption>
+            </figure>
+        </section>
+
+        <section id="installation">
+            <h2>Installation</h2>
+            <p>Create and activate a conda environment with Python 3.11:</p>
+            <pre><code>conda create -n longshot python=3.11 -y
+conda activate longshot
+pip install -r requirements.txt</code></pre>
+            <div class="note">
+                <strong>Note:</strong> If you encounter CUDNN issues, install it separately:
+                <pre><code>conda install -c conda-forge cudnn=8</code></pre>
+            </div>
+        </section>
+
+        <section id="preprocessing">
+            <h2>Data Preprocessing</h2>
+            <p>The preprocessing pipeline downloads videos from YouTube and processes them to extract video, audio, and speech metadata/transcriptions.</p>
+
+            <h3>Setup YouTube Cookie Authentication</h3>
+            <ol>
+                <li>Install the <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc">Get cookies.txt LOCALLY</a> Chrome extension</li>
+                <li>Navigate to YouTube and refresh the page</li>
+                <li>Click on the extension icon and copy the cookies</li>
+                <li>Paste the cookies into <code class="inline-code">preprocess/cookies.txt</code></li>
+            </ol>
+
+            <h3>Download Audio Flamingo Model</h3>
+            <pre><code>cd preprocess
+hf download nvidia/audio-flamingo-3 --local-dir ./MODELS/audio-flamingo-3/</code></pre>
+
+            <h3>Download Videos</h3>
+            <pre><code>python download_youtube_videos.py</code></pre>
+            <div class="note">
+                <strong>Note:</strong> Some videos may fail to download through the script. Please manually download any missing videos and place them in the appropriate directory (preprocess/dataset/videos).
+            </div>
+
+            <h3>Process Videos with VLM</h3>
+            <p>Start the VLM server in a separate terminal:</p>
+            <pre><code>./vllm_start.sh vlm</code></pre>
+            <p>In another terminal, run the VLM processing stages:</p>
+            <pre><code>python run.py vlm-stages</code></pre>
+
+            <h3>Process Videos with LLM</h3>
+            <p>Start the LLM server in a separate terminal:</p>
+            <pre><code>./vllm_start.sh llm</code></pre>
+            <p>In another terminal, run the LLM processing stages:</p>
+            <pre><code>python run.py llm-stages</code></pre>
+        </section>
+
+        <section id="dataset-generation">
+            <h2>Dataset Generation</h2>
+            <p>Generate the LongShOTBench dataset from the preprocessed videos:</p>
+            <pre><code>cd datagen
+python main.py</code></pre>
+            <p>The final dataset will be saved at <code class="inline-code">datagen/results/final_dataset.jsonl</code>.</p>
+
+            <h3>Upload to Hugging Face</h3>
+            <p>To share the dataset on Hugging Face Hub:</p>
+            <pre><code>from datasets import Dataset
+dataset = Dataset.from_json("results/clean_dataset.jsonl")
+dataset.push_to_hub("your-org/longshot-bench", config_name="postvalid")</code></pre>
+        </section>
+
+        <section id="evaluation">
+            <h2>Evaluation</h2>
+            <p>Evaluate model performance on the LongShOTBench dataset.</p>
+
+            <h3>Generate Model Responses</h3>
+            <pre><code>cd eval
+bash generate.sh</code></pre>
+
+            <h3>Evaluate Responses</h3>
+            <pre><code>bash eval.sh</code></pre>
+            <p>Results will be saved in the <code class="inline-code">eval/results_postvalid/</code> directory.</p>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <p>&copy; 2024 MBZUAI. LongShOT is released under the <a href="https://github.com/mbzuai-oryx/BiMediX/blob/main/LICENSE.txt">CC BY-NC-SA 4.0 License</a>.</p>
+    </footer>
+</body>
+</html>
