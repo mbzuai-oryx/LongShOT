@@ -58,17 +58,17 @@ class ModelCleanupManager:
     def cleanup_whisper_model(self, caption_generator, async_cleanup: bool = False) -> Optional[threading.Thread]:
         """
         Clean up Whisper model resources.
-        
+
         Args:
-            caption_generator: CaptionGenerator or EnhancedCaptionGenerator instance
+            caption_generator: CaptionGenerator instance
             async_cleanup: Whether to run cleanup in background thread
-            
+
         Returns:
             Threading.Thread if async_cleanup=True, None otherwise
         """
         def _cleanup_whisper():
             try:
-                rich_console.print_info("🧹 Cleaning up Whisper model resources...")
+                rich_console.print_info("Cleaning up Whisper model resources...")
                 
                 # Clear Whisper models
                 if hasattr(caption_generator, 'model'):
@@ -89,7 +89,7 @@ class ModelCleanupManager:
                 # Force GPU memory cleanup
                 self._force_gpu_cleanup()
                 
-                rich_console.print_success("✓ Whisper model cleanup completed")
+                rich_console.print_success("Whisper model cleanup completed")
                 
             except Exception as e:
                 rich_console.print_warning(f"Warning during Whisper cleanup: {e}")
@@ -109,27 +109,27 @@ class ModelCleanupManager:
             _cleanup_whisper()
             return None
     
-    def cleanup_clip_model(self, visual_detector_or_enhancer, async_cleanup: bool = False) -> Optional[threading.Thread]:
+    def cleanup_clip_model(self, component, async_cleanup: bool = False) -> Optional[threading.Thread]:
         """
         Clean up CLIP model resources.
-        
+
         Args:
-            visual_detector_or_enhancer: VisualEventDetector or MovieCaptionEnhancer instance
+            component: Component with CLIP model (e.g., VisualEventDetector)
             async_cleanup: Whether to run cleanup in background thread
-            
+
         Returns:
             Threading.Thread if async_cleanup=True, None otherwise
         """
         def _cleanup_clip():
             try:
-                rich_console.print_info("🧹 Cleaning up CLIP model resources...")
-                
-                self._cleanup_clip_model(visual_detector_or_enhancer)
+                rich_console.print_info("Cleaning up CLIP model resources...")
+
+                self._cleanup_clip_model(component)
                 
                 # Force GPU memory cleanup
                 self._force_gpu_cleanup()
                 
-                rich_console.print_success("✓ CLIP model cleanup completed")
+                rich_console.print_success("CLIP model cleanup completed")
                 
             except Exception as e:
                 rich_console.print_warning(f"Warning during CLIP cleanup: {e}")
@@ -162,7 +162,7 @@ class ModelCleanupManager:
         """
         def _cleanup_audio_flamingo():
             try:
-                rich_console.print_info("🧹 Cleaning up Audio Flamingo 3 model resources...")
+                rich_console.print_info("Cleaning up Audio Flamingo 3 model resources...")
                 
                 # Use the built-in cleanup method
                 if hasattr(audio_descriptor, 'cleanup'):
@@ -177,7 +177,7 @@ class ModelCleanupManager:
                 # Force GPU memory cleanup
                 self._force_gpu_cleanup()
                 
-                rich_console.print_success("✓ Audio Flamingo 3 model cleanup completed")
+                rich_console.print_success("Audio Flamingo 3 model cleanup completed")
                 
             except Exception as e:
                 rich_console.print_warning(f"Warning during Audio Flamingo cleanup: {e}")
@@ -276,7 +276,7 @@ class ModelCleanupManager:
                 rich_console.print_warning(f"Some cleanups still active: {self.active_cleanups}")
                 return False
         
-        rich_console.print_success("✓ All model cleanup operations completed")
+        rich_console.print_success("All model cleanup operations completed")
         return True
     
     def parallel_cleanup_with_next_stage_init(self, components_to_cleanup: dict, 
@@ -301,23 +301,23 @@ class ModelCleanupManager:
         if next_stage_kwargs is None:
             next_stage_kwargs = {}
         
-        rich_console.print_info("🔄 Starting parallel cleanup with next stage initialization...")
+        rich_console.print_info("Starting parallel cleanup with next stage initialization...")
         
         # Start cleanup in background
         self.cleanup_all_models(components_to_cleanup, async_cleanup=True)
         
         try:
             # Initialize next stage while cleanup happens in background
-            rich_console.print_info("🚀 Initializing next stage while cleanup runs in background...")
+            rich_console.print_info("Initializing next stage while cleanup runs in background...")
             result = next_stage_init_func(*next_stage_args, **next_stage_kwargs)
             
             # Wait for cleanup to complete (with reasonable timeout)
             cleanup_completed = self.wait_for_cleanup_completion(timeout=60.0)
             
             if not cleanup_completed:
-                rich_console.print_warning("⚠️  Some cleanup operations may still be running")
+                rich_console.print_warning("Some cleanup operations may still be running")
             else:
-                rich_console.print_success("✓ Parallel cleanup and next stage initialization completed successfully")
+                rich_console.print_success("Parallel cleanup and next stage initialization completed successfully")
             
             return result
             
@@ -338,7 +338,7 @@ class ModelCleanupManager:
             del component.clip_preprocess
             component.clip_preprocess = None
         
-        # Handle MovieCaptionEnhancer with VisualEventDetector
+        # Handle components with embedded VisualEventDetector
         if hasattr(component, 'visual_detector') and component.visual_detector:
             if hasattr(component.visual_detector, 'clip_model'):
                 del component.visual_detector.clip_model
@@ -351,7 +351,7 @@ class ModelCleanupManager:
         """Clean up generic PyTorch models."""
         def _cleanup():
             try:
-                rich_console.print_info(f"🧹 Cleaning up {component_name} model resources...")
+                rich_console.print_info(f"Cleaning up {component_name} model resources...")
                 
                 # Look for common PyTorch model attributes
                 model_attrs = ['model', 'net', 'network', 'encoder', 'decoder']
@@ -369,7 +369,7 @@ class ModelCleanupManager:
                 
                 if cleaned_any:
                     self._force_gpu_cleanup()
-                    rich_console.print_success(f"✓ {component_name} model cleanup completed")
+                    rich_console.print_success(f"{component_name} model cleanup completed")
                 
             except Exception as e:
                 rich_console.print_warning(f"Warning during {component_name} cleanup: {e}")

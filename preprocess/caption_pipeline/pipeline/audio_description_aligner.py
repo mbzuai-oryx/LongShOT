@@ -10,8 +10,8 @@ import os
 import json
 import time
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Dict, Optional
 import sys
 
 # Import project configuration
@@ -21,12 +21,20 @@ from config import LLM_MODEL, LLM_SERVER_URL, AUDIO_DESCRIPTIONS_DIR
 # Import rich console utilities
 from caption_pipeline.utils.rich_console import get_console
 
-# Import required components
-from openai import OpenAI
+# Import common VLM utilities
+from caption_pipeline.utils.vlm_common import (
+    create_vllm_client, has_valid_description,
+    collect_concurrent_results, format_context_segments
+)
 
 # Set up logging
 logger = logging.getLogger(__name__)
 rich_console = get_console()
+
+# Constants for alignment
+ALIGNMENT_MAX_TOKENS = 500  # Tokens for comprehensive audio descriptions
+ALIGNMENT_TEMPERATURE = 0.3  # Lower temperature for consistent alignment
+MIN_DESCRIPTION_LENGTH = 50  # Minimum valid description length
 
 # Improved audio alignment prompt with positive guidance for temporal coherence
 AUDIO_ALIGNMENT_PROMPT = """
@@ -48,10 +56,10 @@ DESCRIPTION GUIDELINES:
 - Include spatial audio cues when relevant (direction, distance, movement)
 
 QUALITY INDICATORS:
-✓ Smooth transition from previous audio context
-✓ Clear identification of new or changed audio elements  
-✓ Consistent environmental description
-✓ Natural, flowing language without repetitive phrases
+- Smooth transition from previous audio context
+- Clear identification of new or changed audio elements
+- Consistent environmental description
+- Natural, flowing language without repetitive phrases
 
 Previous Context: {previous_audio_context}
 Current Description: {current_audio_description}
@@ -80,21 +88,7 @@ class AudioDescriptionAligner:
         rich_console.print_info(f"Audio Description Aligner initialized with model: {model_name}")
         rich_console.print_info(f"Using API base: {self.api_base}")
         rich_console.print_info(f"Context segments: {self.context_segments}")
-    
-    def _test_connection(self):
-        """Test connection to vLLM server."""
-        try:
-            client = OpenAI(api_key="token-abc123", base_url=self.api_base)
-            client.chat.completions.create(
-                model=self.model_name,
-                messages=[{"role": "user", "content": "Test"}],
-                max_tokens=5
-            )
-            rich_console.print_info(f"vLLM server connection successful at {self.api_base}")
-        except Exception as e:
-            rich_console.print_error(f"Failed to connect to vLLM server: {e}")
-            raise
-    
+
     def align_audio_descriptions(self, audio_descriptions_file: str) -> Optional[str]:
         """Align audio descriptions in a file to improve temporal and spatial continuity.
         
@@ -134,29 +128,25 @@ class AudioDescriptionAligner:
         alignment_tasks = []
         for i in range(1, len(segments)):  # Start from second segment
             current_segment = segments[i]
-            
-            # Only align segments that have audio descriptions
-            if (current_segment.get('audio_description') and 
-                current_segment['audio_description'] not in ["No audio description available", "", None]):
-                
+
+            # Only align segments that have valid audio descriptions
+            if has_valid_description(current_segment, 'audio_description'):
                 # Gather context from previous segments
                 context_start = max(0, i - self.context_segments)
                 previous_segments = segments[context_start:i]
-                
+
                 # Filter previous segments to only include those with valid audio descriptions
-                valid_previous_segments = []
-                for prev_seg in previous_segments:
-                    if (prev_seg.get('audio_description') and 
-                        prev_seg['audio_description'] not in ["No audio description available", "", None]):
-                        valid_previous_segments.append(prev_seg)
-                
+                valid_previous_segments = [
+                    seg for seg in previous_segments
+                    if has_valid_description(seg, 'audio_description')
+                ]
+
                 # Only create alignment task if we have valid previous context
                 if valid_previous_segments:
                     alignment_tasks.append({
                         'segment_index': i,
                         'current_description': current_segment['audio_description'],
-                        'previous_segments': valid_previous_segments,
-                        'segment_data': current_segment
+                        'previous_segments': valid_previous_segments
                     })
         
         if not alignment_tasks:
@@ -213,103 +203,74 @@ class AudioDescriptionAligner:
     
     def _process_alignments_concurrent(self, alignment_tasks: List[Dict]) -> List[str]:
         """Process alignment tasks concurrently."""
-        aligned_descriptions = []
-        
         if not alignment_tasks:
-            return aligned_descriptions
-        
+            return []
+
         rich_console.print_info(f"Processing {len(alignment_tasks)} alignment tasks with {self.max_workers} workers")
-        
+
         # Create progress tracking
         try:
             progress, task_id = rich_console.create_multimodal_alignment_progress("Audio Alignment", len(alignment_tasks))
-        except:
-            # Fallback if specific progress method doesn't exist
+        except Exception:
             progress, task_id = None, None
-        
+
         # Process alignments concurrently
         max_concurrent = min(len(alignment_tasks), self.max_workers)
         with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
-            # Submit all alignment requests
-            future_to_index = {}
-            for i, task in enumerate(alignment_tasks):
-                future = executor.submit(self._align_single_description, 
-                                       task['current_description'], 
-                                       task['previous_segments'])
-                future_to_index[future] = i
-            
-            # Initialize results with None values
-            aligned_descriptions = [None] * len(alignment_tasks)
-            
-            # Collect results with progress tracking
-            completed_count = 0
+            future_to_index = {
+                executor.submit(
+                    self._align_single_description,
+                    task['current_description'],
+                    task['previous_segments']
+                ): i
+                for i, task in enumerate(alignment_tasks)
+            }
+
+            # Use shared utility for result collection with progress
             if progress:
                 with progress:
-                    for future in as_completed(future_to_index):
-                        index = future_to_index[future]
-                        try:
-                            aligned_description = future.result()
-                            aligned_descriptions[index] = aligned_description
-                            completed_count += 1
-                            progress.update(task_id, advance=1)
-                        except Exception as e:
-                            rich_console.print_error(f"Error aligning segment {index}: {e}")
-                            aligned_descriptions[index] = "ALIGNMENT_ERROR"
+                    return collect_concurrent_results(
+                        future_to_index, progress, task_id,
+                        error_value="ALIGNMENT_ERROR", console=rich_console
+                    )
             else:
-                for future in as_completed(future_to_index):
-                    index = future_to_index[future]
-                    try:
-                        aligned_description = future.result()
-                        aligned_descriptions[index] = aligned_description
-                        completed_count += 1
-                        rich_console.print_info(f"Completed alignment {completed_count}/{len(alignment_tasks)}")
-                    except Exception as e:
-                        rich_console.print_error(f"Error aligning segment {index}: {e}")
-                        aligned_descriptions[index] = "ALIGNMENT_ERROR"
-        
-        return aligned_descriptions
+                return collect_concurrent_results(
+                    future_to_index, error_value="ALIGNMENT_ERROR", console=rich_console
+                )
     
     def _align_single_description(self, current_description: str, previous_segments: List[Dict]) -> str:
         """Align a single segment's audio description with multiple previous segments."""
         try:
-            client = OpenAI(api_key="token-abc123", base_url=self.api_base)
-            
-            # Build context from previous segments
-            previous_context = ""
-            for i, prev_seg in enumerate(previous_segments):
-                segment_num = prev_seg.get('segment_index', i)
-                start_time = prev_seg.get('start', 0)
-                end_time = prev_seg.get('end', 0)
-                audio_desc = prev_seg.get('audio_description', '')
-                
-                previous_context += f"Segment {segment_num} ({start_time:.1f}s - {end_time:.1f}s): {audio_desc}\n\n"
-            
+            client = create_vllm_client(self.api_base)
+
+            # Build context from previous segments using shared utility
+            previous_context = format_context_segments(previous_segments, 'audio_description')
+
             # Create prompt for alignment
             prompt = AUDIO_ALIGNMENT_PROMPT.format(
-                previous_audio_context=previous_context.strip(),
+                previous_audio_context=previous_context,
                 current_audio_description=current_description
             )
-            
-            # Make request to vLLM server
+
             response = client.chat.completions.create(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=500,  # Allow for comprehensive audio descriptions with environmental context
-                temperature=0.3   # Lower temperature for more consistent alignment
+                max_tokens=ALIGNMENT_MAX_TOKENS,
+                temperature=ALIGNMENT_TEMPERATURE
             )
-            
+
             aligned_description = response.choices[0].message.content.strip()
-            
-            # Basic validation - ensure we got a reasonable response
-            if len(aligned_description) < 50:  # Too short, likely an error
+
+            # Validate response length
+            if len(aligned_description) < MIN_DESCRIPTION_LENGTH:
                 rich_console.print_warning("Alignment produced very short result, using original")
                 return current_description
-            
+
             return aligned_description
-            
+
         except Exception as e:
             rich_console.print_error(f"Error in alignment request: {e}")
-            return current_description  # Fall back to original description
+            return current_description
     
     def batch_align_audio_descriptions(self, video_ids: List[str] = None, max_videos: int = None, 
                                      audio_descriptions_dir: str = None) -> List[str]:
@@ -368,13 +329,13 @@ class AudioDescriptionAligner:
                 aligned_file = self.align_audio_descriptions(audio_file)
                 if aligned_file:
                     aligned_files.append(aligned_file)
-                    rich_console.print_success(f"✓ Successfully aligned audio descriptions for {video_id} ({i}/{len(files_to_process)})")
+                    rich_console.print_success(f"Successfully aligned audio descriptions for {video_id} ({i}/{len(files_to_process)})")
                 else:
                     failed_files.append(video_id)
-                    rich_console.print_error(f"✗ Failed to align audio descriptions for {video_id} ({i}/{len(files_to_process)})")
+                    rich_console.print_error(f"Failed to align audio descriptions for {video_id} ({i}/{len(files_to_process)})")
             except Exception as e:
                 failed_files.append(video_id)
-                rich_console.print_error(f"✗ Error aligning audio descriptions for {video_id}: {e}")
+                rich_console.print_error(f"Error aligning audio descriptions for {video_id}: {e}")
         
         # Print summary
         success_count = len(aligned_files)
@@ -387,42 +348,5 @@ class AudioDescriptionAligner:
         
         if failed_files:
             rich_console.print_warning(f"Failed to align: {', '.join(failed_files)}")
-        
+
         return aligned_files
-
-
-def main():
-    """Main function for testing the audio description aligner."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Align audio descriptions for temporal and spatial continuity')
-    parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to align')
-    parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    parser.add_argument('--model', type=str, default=LLM_MODEL, help='Language model to use')
-    parser.add_argument('--api-base', type=str, default=LLM_SERVER_URL, help='vLLM server API base URL')
-    parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers')
-    parser.add_argument('--context-segments', type=int, default=3, help='Number of previous segments to use as context')
-    parser.add_argument('--audio-descriptions-dir', type=str, help='Directory containing audio description files')
-    
-    args = parser.parse_args()
-    
-    # Initialize aligner
-    aligner = AudioDescriptionAligner(
-        model_name=args.model,
-        api_base=args.api_base,
-        max_workers=args.max_workers,
-        context_segments=args.context_segments
-    )
-    
-    # Process alignments
-    aligned_files = aligner.batch_align_audio_descriptions(
-        video_ids=args.video_ids,
-        max_videos=args.max_videos,
-        audio_descriptions_dir=args.audio_descriptions_dir
-    )
-    
-    rich_console.print_info(f"Successfully aligned audio descriptions for {len(aligned_files)} videos")
-
-
-if __name__ == "__main__":
-    main()

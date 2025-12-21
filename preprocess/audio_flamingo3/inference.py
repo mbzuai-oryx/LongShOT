@@ -462,7 +462,7 @@ class SimpleInferenceSystem:
                 logger.warning(f"Some workers died ({len(alive_workers)}/{self.num_gpus} alive), restarting all")
                 self.shutdown_workers()
         
-        logger.info(f"🚀 Starting {self.num_gpus} GPU workers...")
+        logger.info(f"Starting {self.num_gpus} GPU workers...")
         
         # Clear any existing workers
         self.workers.clear()
@@ -478,11 +478,11 @@ class SimpleInferenceSystem:
             worker.start()
             self.workers.append(worker)
             worker_pids.append(str(worker.pid))
-            logger.info(f"✓ Started GPU {gpu_id} worker (PID: {worker.pid})")
+            logger.info(f"Started GPU {gpu_id} worker (PID: {worker.pid})")
         
         total_startup_time = time.time() - startup_start
         self._workers_started = True
-        logger.info(f"✅ All {self.num_gpus} GPU workers started in {total_startup_time:.1f}s (PIDs: {', '.join(worker_pids)})")
+        logger.info(f"All {self.num_gpus} GPU workers started in {total_startup_time:.1f}s (PIDs: {', '.join(worker_pids)})")
     
     def batch_inference(self, audio_paths: List[str], text_prompt: str, auto_shutdown: bool = True) -> List[Dict[str, Any]]:
         """Process batch of audio files"""
@@ -841,11 +841,11 @@ def main():
     # Single file mode
     if args.audio:
         if not os.path.exists(args.audio):
-            print(f"❌ Audio file not found: {args.audio}")
+            print(f"Audio file not found: {args.audio}")
             sys.exit(1)
         
         if not args.quiet:
-            print(f"🎵 Processing: {Path(args.audio).name}")
+            print(f"Processing: {Path(args.audio).name}")
         
         system = SimpleInferenceSystem(args.model_path)
         result = system.single_inference(args.audio, args.text)
@@ -855,29 +855,29 @@ def main():
                 print(result['response'])
             else:
                 print(f"\n{'='*60}")
-                print("🎯 RESPONSE:")
+                print("RESPONSE:")
                 print(f"{'='*60}")
                 print(result['response'])
                 print(f"{'='*60}")
-                print(f"⏱️  Processing time: {result['total_time']:.3f}s")
-                print(f"   • Inference: {result['inference_time']:.3f}s")
+                print(f"Processing time: {result['total_time']:.3f}s")
+                print(f"   - Inference: {result['inference_time']:.3f}s")
         else:
-            print(f"❌ Failed: {result['error']}")
+            print(f"Failed: {result['error']}")
             sys.exit(1)
     
     # Batch processing mode
     else:
         if not args.output:
-            print("❌ --output required for batch processing")
+            print("--output required for batch processing")
             sys.exit(1)
         
         if not os.path.exists(args.dir):
-            print(f"❌ Directory not found: {args.dir}")
+            print(f"Directory not found: {args.dir}")
             sys.exit(1)
         
         audio_files = get_audio_files(args.dir)
         if not audio_files:
-            print("❌ No audio files found")
+            print("No audio files found")
             sys.exit(1)
         
         num_gpus = args.gpus or torch.cuda.device_count()
@@ -890,12 +890,12 @@ def main():
                 num_gpus = min(num_gpus, available_gpus)
         
         if not args.quiet:
-            print("🚀 SIMPLIFIED BATCH PROCESSING")
+            print("SIMPLIFIED BATCH PROCESSING")
             print(f"{'='*60}")
-            print(f"📁 Audio files: {len(audio_files):,}")
-            print(f"💻 GPUs: {num_gpus}")
+            print(f"Audio files: {len(audio_files):,}")
+            print(f"GPUs: {num_gpus}")
             if "CUDA_VISIBLE_DEVICES" in os.environ:
-                print(f"🔧 CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
+                print(f"CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
             print(f"{'='*60}")
         
         # Set environment
@@ -920,15 +920,15 @@ def main():
                 avg_inference = sum(r['inference_time'] for r in successful) / len(successful)
                 throughput = len(successful) / total_time * 60
                 
-                print("\n🎉 Batch processing completed!")
-                print(f"📊 Successful: {len(successful)}/{len(results)} files")
-                print(f"⏱️  Average inference: {avg_inference:.3f}s per file")
-                print(f"🚀 Total time: {total_time/60:.1f} minutes")
-                print(f"🎯 Throughput: {throughput:.1f} files/minute")
-                print(f"💾 Results saved: {args.output}")
+                print("\nBatch processing completed!")
+                print(f"Successful: {len(successful)}/{len(results)} files")
+                print(f"Average inference: {avg_inference:.3f}s per file")
+                print(f"Total time: {total_time/60:.1f} minutes")
+                print(f"Throughput: {throughput:.1f} files/minute")
+                print(f"Results saved: {args.output}")
             
             if failed:
-                print(f"❌ Failed: {len(failed)} files")
+                print(f"Failed: {len(failed)} files")
         else:
             print(f"Processed {len(successful)}/{len(results)} files in {total_time/60:.1f}min")
 
@@ -938,8 +938,8 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n❌ Interrupted by user")
+        print("\nInterrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
         sys.exit(1)

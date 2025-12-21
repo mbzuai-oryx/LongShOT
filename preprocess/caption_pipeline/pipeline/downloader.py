@@ -1,6 +1,6 @@
 """
-Video downloader module for the Arabic video dataset.
-This module handles downloading Arabic videos from YouTube using video IDs from a file.
+Video downloader module for the LongShOT video dataset.
+This module handles downloading videos from YouTube using video IDs from a file.
 """
 
 import os
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 rich_console = get_console()
 
 class VideoDownloader:
-    """Class to download Arabic videos from YouTube using video IDs."""
+    """Class to download videos from YouTube using video IDs."""
     
     def __init__(self):
         """Initialize the VideoDownloader."""
@@ -58,7 +58,7 @@ class VideoDownloader:
             self.metadata_df = pd.DataFrame(columns=[
                 'video_id', 'title', 'channel', 'duration', 'view_count',
                 'publish_date', 'description', 'tags', 'download_date',
-                'file_path', 'status'
+                'file_path', 'status', 'audio_path', 'caption_path'
             ])
         
         # Add a threading lock for metadata access
@@ -191,8 +191,7 @@ class VideoDownloader:
                 'sleep_interval_request' : 10,  # Sleep 10 seconds between requests
                 'legacyserverconnect' : True,  # Use legacy server connection method
                 'geo_bypass': True,  # Bypass geographic restrictions
-                'geo_bypass_country': 'UK',  # Assume US location for geo bypass
-                'geo_bypass_ip_block': 'auto',  # Auto-detect IP block for geo bypass
+                'geo_bypass_country': 'UK',  # Bypass using UK location
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',  # Convert to MP4 if needed
@@ -455,7 +454,7 @@ def main():
     """Main function to run the downloader."""
     import argparse
     
-    parser = argparse.ArgumentParser(description='Download Arabic videos from YouTube')
+    parser = argparse.ArgumentParser(description='Download videos from YouTube')
     parser.add_argument('--max-videos', type=int, default=None, 
                         help='Maximum number of videos to download')
     parser.add_argument('--workers', type=int, default=4, 

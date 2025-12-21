@@ -10,8 +10,8 @@ import os
 import json
 import time
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Dict, Optional
 import sys
 
 # Import project configuration
@@ -21,8 +21,10 @@ from config import LLM_MODEL, LLM_SERVER_URL, MULTIMODAL_UNDERSTANDING_DIR
 # Import rich console utilities
 from caption_pipeline.utils.rich_console import get_console
 
-# Import required components
-from openai import OpenAI
+# Import common VLM utilities
+from caption_pipeline.utils.vlm_common import (
+    create_vllm_client, has_valid_description, collect_concurrent_results
+)
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -49,11 +51,11 @@ TEMPORAL ALIGNMENT STRUCTURE:
 - Conclude with prominent new developments or changes
 
 MULTIMODAL QUALITY INDICATORS:
-✓ Seamless integration of visual and audio elements
-✓ Clear temporal progression from previous context
-✓ Cross-modal relationships and interactions described
-✓ Unified narrative that captures the complete sensory experience
-✓ Natural flow connecting different modality descriptions
+- Seamless integration of visual and audio elements
+- Clear temporal progression from previous context
+- Cross-modal relationships and interactions described
+- Unified narrative that captures the complete sensory experience
+- Natural flow connecting different modality descriptions
 
 Previous Multimodal Context: {previous_multimodal_understanding}
 Current Multimodal Content: {current_multimodal_understanding}
@@ -79,21 +81,7 @@ class MultimodalUnderstandingAligner:
         
         rich_console.print_info(f"Multimodal Understanding Aligner initialized with model: {model_name}")
         rich_console.print_info(f"Using API base: {self.api_base}")
-    
-    def _test_connection(self):
-        """Test connection to vLLM server."""
-        try:
-            client = OpenAI(api_key="token-abc123", base_url=self.api_base)
-            client.chat.completions.create(
-                model=self.model_name,
-                messages=[{"role": "user", "content": "Test"}],
-                max_tokens=5
-            )
-            rich_console.print_info(f"vLLM server connection successful at {self.api_base}")
-        except Exception as e:
-            rich_console.print_error(f"Failed to connect to vLLM server: {e}")
-            raise
-    
+
     def align_multimodal_understanding(self, multimodal_file: str) -> Optional[str]:
         """Align multimodal understanding in a file to improve temporal continuity.
         
@@ -134,18 +122,14 @@ class MultimodalUnderstandingAligner:
         for i in range(1, len(segments)):
             current_segment = segments[i]
             previous_segment = segments[i - 1]
-            
-            # Only align segments that have multimodal understanding
-            if (current_segment.get('multimodal_understanding') and 
-                previous_segment.get('multimodal_understanding') and
-                current_segment['multimodal_understanding'] != "No multimodal understanding available" and
-                previous_segment['multimodal_understanding'] != "No multimodal understanding available"):
-                
+
+            # Only align segments that have valid multimodal understanding
+            if (has_valid_description(current_segment, 'multimodal_understanding') and
+                has_valid_description(previous_segment, 'multimodal_understanding')):
                 alignment_tasks.append({
                     'segment_index': i,
                     'current_understanding': current_segment['multimodal_understanding'],
-                    'previous_understanding': previous_segment['multimodal_understanding'],
-                    'segment_data': current_segment
+                    'previous_understanding': previous_segment['multimodal_understanding']
                 })
         
         if not alignment_tasks:
@@ -201,65 +185,45 @@ class MultimodalUnderstandingAligner:
     
     def _process_alignments_concurrent(self, alignment_tasks: List[Dict]) -> List[str]:
         """Process alignment tasks concurrently."""
-        aligned_understandings = []
-        
         if not alignment_tasks:
-            return aligned_understandings
-        
+            return []
+
         rich_console.print_info(f"Processing {len(alignment_tasks)} alignment tasks with {self.max_workers} workers")
-        
+
         # Create progress tracking
         try:
             progress, task_id = rich_console.create_multimodal_alignment_progress("Alignment", len(alignment_tasks))
-        except:
+        except Exception:
             progress, task_id = None, None
-        
+
         # Process alignments concurrently
         max_concurrent = min(len(alignment_tasks), self.max_workers)
         with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
-            # Submit all alignment requests
-            future_to_index = {}
-            for i, task in enumerate(alignment_tasks):
-                future = executor.submit(self._align_single_understanding, 
-                                       task['current_understanding'], 
-                                       task['previous_understanding'])
-                future_to_index[future] = i
-            
-            # Initialize results with None values
-            aligned_understandings = [None] * len(alignment_tasks)
-            
-            # Collect results with progress tracking
-            completed_count = 0
+            future_to_index = {
+                executor.submit(
+                    self._align_single_understanding,
+                    task['current_understanding'],
+                    task['previous_understanding']
+                ): i
+                for i, task in enumerate(alignment_tasks)
+            }
+
+            # Use shared utility for result collection with progress
             if progress:
                 with progress:
-                    for future in as_completed(future_to_index):
-                        index = future_to_index[future]
-                        try:
-                            aligned_understanding = future.result()
-                            aligned_understandings[index] = aligned_understanding
-                            completed_count += 1
-                            progress.update(task_id, advance=1)
-                        except Exception as e:
-                            rich_console.print_error(f"Error aligning segment {index}: {e}")
-                            aligned_understandings[index] = "ALIGNMENT_ERROR"
+                    return collect_concurrent_results(
+                        future_to_index, progress, task_id,
+                        error_value="ALIGNMENT_ERROR", console=rich_console
+                    )
             else:
-                for future in as_completed(future_to_index):
-                    index = future_to_index[future]
-                    try:
-                        aligned_understanding = future.result()
-                        aligned_understandings[index] = aligned_understanding
-                        completed_count += 1
-                        rich_console.print_info(f"Completed alignment {completed_count}/{len(alignment_tasks)}")
-                    except Exception as e:
-                        rich_console.print_error(f"Error aligning segment {index}: {e}")
-                        aligned_understandings[index] = "ALIGNMENT_ERROR"
-        
-        return aligned_understandings
+                return collect_concurrent_results(
+                    future_to_index, error_value="ALIGNMENT_ERROR", console=rich_console
+                )
     
     def _align_single_understanding(self, current_understanding: str, previous_understanding: str) -> str:
         """Align a single segment's multimodal understanding with its previous segment."""
         try:
-            client = OpenAI(api_key="token-abc123", base_url=self.api_base)
+            client = create_vllm_client(self.api_base)
             
             # Create prompt for alignment
             prompt = MULTIMODAL_ALIGNMENT_PROMPT.format(
@@ -345,13 +309,13 @@ class MultimodalUnderstandingAligner:
                 aligned_file = self.align_multimodal_understanding(multimodal_file)
                 if aligned_file:
                     aligned_files.append(aligned_file)
-                    rich_console.print_success(f"✓ Successfully aligned multimodal understanding for {video_id} ({i}/{len(files_to_process)})")
+                    rich_console.print_success(f"Successfully aligned multimodal understanding for {video_id} ({i}/{len(files_to_process)})")
                 else:
                     failed_files.append(video_id)
-                    rich_console.print_error(f"✗ Failed to align multimodal understanding for {video_id} ({i}/{len(files_to_process)})")
+                    rich_console.print_error(f"Failed to align multimodal understanding for {video_id} ({i}/{len(files_to_process)})")
             except Exception as e:
                 failed_files.append(video_id)
-                rich_console.print_error(f"✗ Error aligning multimodal understanding for {video_id}: {e}")
+                rich_console.print_error(f"Error aligning multimodal understanding for {video_id}: {e}")
         
         # Print summary
         success_count = len(aligned_files)
@@ -366,38 +330,3 @@ class MultimodalUnderstandingAligner:
             rich_console.print_warning(f"Failed to align: {', '.join(failed_files)}")
         
         return aligned_files
-
-
-def main():
-    """Main function for testing the multimodal understanding aligner."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Align multimodal understanding for temporal continuity')
-    parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to align')
-    parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    parser.add_argument('--model', type=str, default=LLM_MODEL, help='Language model to use')
-    parser.add_argument('--api-base', type=str, default=LLM_SERVER_URL, help='vLLM server API base URL')
-    parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers')
-    parser.add_argument('--multimodal-dir', type=str, help='Directory containing multimodal understanding files')
-    
-    args = parser.parse_args()
-    
-    # Initialize aligner
-    aligner = MultimodalUnderstandingAligner(
-        model_name=args.model,
-        api_base=args.api_base,
-        max_workers=args.max_workers
-    )
-    
-    # Process alignments
-    aligned_files = aligner.batch_align_multimodal_understanding(
-        video_ids=args.video_ids,
-        max_videos=args.max_videos,
-        multimodal_dir=args.multimodal_dir
-    )
-    
-    rich_console.print_info(f"Successfully aligned multimodal understanding for {len(aligned_files)} videos")
-
-
-if __name__ == "__main__":
-    main()

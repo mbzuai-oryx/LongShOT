@@ -122,73 +122,70 @@ class DatasetAnalyzer:
         
         return stats
     
+    def _analyze_single_audio_file(self, desc_file: Path, alignment_status: str) -> Dict[str, Any]:
+        """Analyze a single audio description file and return statistics.
+
+        Args:
+            desc_file: Path to the audio description JSON file
+            alignment_status: Either "aligned" or "original"
+
+        Returns:
+            Dict with segment_count, avg_description_length, and alignment_status
+        """
+        with open(desc_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        segments = data.get('segments', [])
+        video_stats = {
+            "segment_count": len(segments),
+            "avg_description_length": 0,
+            "alignment_status": alignment_status
+        }
+
+        if segments:
+            descriptions = [seg.get('audio_description', '') for seg in segments if seg.get('audio_description')]
+            if descriptions:
+                video_stats["avg_description_length"] = statistics.mean(len(desc.split()) for desc in descriptions)
+
+        return video_stats
+
     def analyze_audio_descriptions(self) -> Dict[str, Any]:
         """Analyze audio description files, preferring aligned files."""
         stats = {"total_descriptions": 0, "videos": {}}
-        
+
         if not self.audio_descriptions_dir.exists():
             return stats
-        
+
         # Collect all video IDs that have audio descriptions (aligned or original)
         video_ids_processed = set()
-        
+
         # First process aligned files
         for desc_file in self.audio_descriptions_dir.glob("*_audio_descriptions_aligned.json"):
             video_id = desc_file.name.replace('_audio_descriptions_aligned.json', '')
             video_ids_processed.add(video_id)
             try:
-                with open(desc_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                
-                segments = data.get('segments', [])
-                video_stats = {
-                    "segment_count": len(segments),
-                    "avg_description_length": 0,
-                    "alignment_status": "aligned"
-                }
-                
-                if segments:
-                    descriptions = [seg.get('audio_description', '') for seg in segments if seg.get('audio_description')]
-                    if descriptions:
-                        video_stats["avg_description_length"] = statistics.mean(len(desc.split()) for desc in descriptions)
-                
+                video_stats = self._analyze_single_audio_file(desc_file, "aligned")
                 stats["videos"][video_id] = video_stats
                 stats["total_descriptions"] += video_stats["segment_count"]
-                
             except Exception as e:
                 rich_console.print_warning(f"Error analyzing aligned audio description file {desc_file}: {e}")
-        
+
         # Then process original files for videos not yet processed
         for desc_file in self.audio_descriptions_dir.glob("*_audio_descriptions.json"):
             if desc_file.name.endswith("_aligned.json"):
                 continue  # Skip already processed aligned files
-                
+
             video_id = desc_file.name.replace('_audio_descriptions.json', '')
             if video_id in video_ids_processed:
                 continue  # Skip if we already processed the aligned version
-                
+
             try:
-                with open(desc_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                
-                segments = data.get('segments', [])
-                video_stats = {
-                    "segment_count": len(segments),
-                    "avg_description_length": 0,
-                    "alignment_status": "original"
-                }
-                
-                if segments:
-                    descriptions = [seg.get('audio_description', '') for seg in segments if seg.get('audio_description')]
-                    if descriptions:
-                        video_stats["avg_description_length"] = statistics.mean(len(desc.split()) for desc in descriptions)
-                
+                video_stats = self._analyze_single_audio_file(desc_file, "original")
                 stats["videos"][video_id] = video_stats
                 stats["total_descriptions"] += video_stats["segment_count"]
-                
             except Exception as e:
                 rich_console.print_warning(f"Error analyzing audio description file {desc_file}: {e}")
-        
+
         return stats
     
     def format_size(self, size_bytes: int) -> str:
@@ -204,7 +201,7 @@ class DatasetAnalyzer:
     
     def generate_summary(self) -> Dict[str, Any]:
         """Generate comprehensive dataset summary."""
-        rich_console.print_info("🔍 Analyzing dataset components...")
+        rich_console.print_info("Analyzing dataset components...")
         
         # Load metadata
         metadata = self.load_metadata()
@@ -360,42 +357,42 @@ class DatasetAnalyzer:
         rich_console.print_component_header("Dataset Summary", "Comprehensive overview of generated dataset")
         
         # Overview
-        rich_console.print_info("📊 Dataset Overview:")
-        rich_console.print_info(f"  • Total videos: {overview['total_videos']}")
-        rich_console.print_info(f"  • Completed videos: {overview['completed_videos']}")
-        rich_console.print_info(f"  • Failed videos: {overview['failed_videos']}")
-        rich_console.print_info(f"  • Success rate: {overview['success_rate']}")
+        rich_console.print_info("Dataset Overview:")
+        rich_console.print_info(f"  - Total videos: {overview['total_videos']}")
+        rich_console.print_info(f"  - Completed videos: {overview['completed_videos']}")
+        rich_console.print_info(f"  - Failed videos: {overview['failed_videos']}")
+        rich_console.print_info(f"  - Success rate: {overview['success_rate']}")
         rich_console.print_info("")
         
         # Duration statistics
         if duration_stats:
             hours = duration_stats["total_duration_hours"]
             avg_min = duration_stats["average_duration_seconds"] / 60
-            rich_console.print_info("⏱️ Duration Statistics:")
-            rich_console.print_info(f"  • Total duration: {hours:.1f} hours ({duration_stats['total_duration_seconds']:.0f} seconds)")
-            rich_console.print_info(f"  • Average video length: {avg_min:.1f} minutes")
-            rich_console.print_info(f"  • Shortest video: {duration_stats['min_duration_seconds']:.0f} seconds")
-            rich_console.print_info(f"  • Longest video: {duration_stats['max_duration_seconds']:.0f} seconds")
+            rich_console.print_info("Duration Statistics:")
+            rich_console.print_info(f"  - Total duration: {hours:.1f} hours ({duration_stats['total_duration_seconds']:.0f} seconds)")
+            rich_console.print_info(f"  - Average video length: {avg_min:.1f} minutes")
+            rich_console.print_info(f"  - Shortest video: {duration_stats['min_duration_seconds']:.0f} seconds")
+            rich_console.print_info(f"  - Longest video: {duration_stats['max_duration_seconds']:.0f} seconds")
             rich_console.print_info("")
         
         # Categories
         categories = summary["content_categories"]
         if categories:
-            rich_console.print_info("🏷️ Content Categories:")
+            rich_console.print_info("Content Categories:")
             for category, count in list(categories.items())[:10]:  # Top 10 categories
                 if category.strip():  # Only show non-empty categories
-                    rich_console.print_info(f"  • {category}: {count} videos")
+                    rich_console.print_info(f"  - {category}: {count} videos")
             rich_console.print_info("")
         
         # File statistics
-        rich_console.print_info("📁 Component Statistics:")
-        rich_console.print_info(f"  • Videos: {file_stats['videos']['count']} files ({file_stats['videos']['total_size']})")
-        rich_console.print_info(f"  • Audio: {file_stats['audio']['count']} files ({file_stats['audio']['total_size']})")
-        rich_console.print_info(f"  • Captions: {file_stats['captions']['count']} files ({file_stats['captions']['total_segments']} segments)")
-        rich_console.print_info(f"  • Video descriptions: {file_stats['video_descriptions']['count']} files ({file_stats['video_descriptions']['total_descriptions']} descriptions)")
-        rich_console.print_info(f"  • Audio descriptions: {file_stats['audio_descriptions']['count']} files ({file_stats['audio_descriptions']['total_descriptions']} descriptions)")
-        rich_console.print_info(f"  • Multimodal understanding: {file_stats['multimodal_understanding']['count']} files ({file_stats['multimodal_understanding']['total_size']})")
-        rich_console.print_info(f"  • Final consolidated: {file_stats['final_consolidated']['count']} files ({file_stats['final_consolidated']['total_size']})")
+        rich_console.print_info("Component Statistics:")
+        rich_console.print_info(f"  - Videos: {file_stats['videos']['count']} files ({file_stats['videos']['total_size']})")
+        rich_console.print_info(f"  - Audio: {file_stats['audio']['count']} files ({file_stats['audio']['total_size']})")
+        rich_console.print_info(f"  - Captions: {file_stats['captions']['count']} files ({file_stats['captions']['total_segments']} segments)")
+        rich_console.print_info(f"  - Video descriptions: {file_stats['video_descriptions']['count']} files ({file_stats['video_descriptions']['total_descriptions']} descriptions)")
+        rich_console.print_info(f"  - Audio descriptions: {file_stats['audio_descriptions']['count']} files ({file_stats['audio_descriptions']['total_descriptions']} descriptions)")
+        rich_console.print_info(f"  - Multimodal understanding: {file_stats['multimodal_understanding']['count']} files ({file_stats['multimodal_understanding']['total_size']})")
+        rich_console.print_info(f"  - Final consolidated: {file_stats['final_consolidated']['count']} files ({file_stats['final_consolidated']['total_size']})")
     
     def generate_and_save_summary(self) -> str:
         """Generate summary, save to file, and print to console."""

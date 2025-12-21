@@ -7,11 +7,10 @@ import os
 import json
 import logging
 import pandas as pd
-from typing import List, Dict, Any, Optional, Tuple, Set
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Dict, Any, Optional
+from concurrent.futures import ThreadPoolExecutor
 import sys
 import time
-from datetime import datetime
 import cv2
 
 # Import project configuration
@@ -29,6 +28,11 @@ try:
 except ImportError:
     VLLM_AVAILABLE = False
     OpenAI = None
+
+# Import common VLM utilities
+from caption_pipeline.utils.vlm_common import (
+    create_vllm_client, load_json_file, load_aligned_json, collect_concurrent_results
+)
 
 # Set up logging
 logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'logs')
@@ -117,28 +121,28 @@ You are an expert content taxonomist and media analyst with deep understanding o
 **CLASSIFICATION METHODOLOGY:**
 
 **Content Analysis:**
-• Examine the video's primary purpose, format, and production style
-• Identify target audience demographics and engagement patterns  
-• Analyze narrative structure, presentation style, and content depth
-• Assess educational vs. entertainment value and content sophistication
+- Examine the video's primary purpose, format, and production style
+- Identify target audience demographics and engagement patterns
+- Analyze narrative structure, presentation style, and content depth
+- Assess educational vs. entertainment value and content sophistication
 
 **Genre Recognition:**
-• Determine primary and secondary genre characteristics
-• Identify subgenres and niche category elements
-• Recognize hybrid formats that blend multiple category types
-• Consider cultural context and platform-specific conventions
+- Determine primary and secondary genre characteristics
+- Identify subgenres and niche category elements
+- Recognize hybrid formats that blend multiple category types
+- Consider cultural context and platform-specific conventions
 
 **Audience Matching:**
-• Analyze content appropriateness for different age groups
-• Identify specific interest communities and fan bases
-• Consider viewing context (education, entertainment, information, etc.)
-• Assess content complexity and engagement level requirements
+- Analyze content appropriateness for different age groups
+- Identify specific interest communities and fan bases
+- Consider viewing context (education, entertainment, information, etc.)
+- Assess content complexity and engagement level requirements
 
 **Quality & Context Assessment:**
-• Evaluate production values and professional quality markers
-• Identify format-specific characteristics (tutorial steps, narrative arcs, etc.)
-• Analyze cultural or temporal context that influences categorization
-• Consider algorithmic and search optimization factors
+- Evaluate production values and professional quality markers
+- Identify format-specific characteristics (tutorial steps, narrative arcs, etc.)
+- Analyze cultural or temporal context that influences categorization
+- Consider algorithmic and search optimization factors
 
 **CLASSIFICATION REQUIREMENTS:**
 Provide 1-3 most accurate categories as a comma-separated list. Consider:
@@ -192,8 +196,7 @@ class VideoMetadataGenerator:
     def _create_client(self):
         """Create a new OpenAI client instance for this thread."""
         try:
-            client = OpenAI(api_key="EMPTY", base_url=self.api_base)
-            return client
+            return create_vllm_client(self.api_base)
         except Exception as e:
             rich_console.print_error(f"Failed to create OpenAI client: {e}")
             return None
@@ -206,9 +209,9 @@ class VideoMetadataGenerator:
         else:
             rich_console.print_warning(f"Metadata file {self.metadata_file} not found. Creating empty DataFrame.")
             self.metadata_df = pd.DataFrame(columns=[
-                'video_id', 'title', 'channel', 'duration', 'view_count', 
+                'video_id', 'title', 'channel', 'duration', 'view_count',
                 'publish_date', 'description', 'tags', 'download_date',
-                'file_path', 'status', 'caption_path'
+                'file_path', 'status', 'audio_path', 'caption_path'
             ])
     
     def _save_metadata(self):
@@ -218,39 +221,16 @@ class VideoMetadataGenerator:
     
     def _load_multimodal_understanding(self, video_id):
         """Load multimodal understanding data for a video."""
-        # Try aligned version first, fall back to non-aligned
-        aligned_file = os.path.join(self.multimodal_understanding_dir, f"{video_id}_multimodal_understanding_aligned.json")
-        non_aligned_file = os.path.join(self.multimodal_understanding_dir, f"{video_id}_multimodal_understanding.json")
-        
-        try:
-            if os.path.exists(aligned_file):
-                with open(aligned_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            elif os.path.exists(non_aligned_file):
-                logger.debug(f"Using non-aligned multimodal understanding for {video_id}")
-                with open(non_aligned_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            else:
-                logger.debug(f"No multimodal understanding data found for video {video_id}")
-                return None
-        except Exception as e:
-            logger.debug(f"Error loading multimodal understanding data for video {video_id}: {e}")
-            return None
+        base_path = os.path.join(self.multimodal_understanding_dir, f"{video_id}_multimodal_understanding")
+        return load_aligned_json(base_path, console=rich_console)
 
     def _load_video_descriptions(self, video_id):
         """Load video descriptions from the JSON file."""
         descriptions_file = os.path.join(self.video_descriptions_dir, f"{video_id}_descriptions_aligned.json")
-        if not os.path.exists(descriptions_file):
-            rich_console.print_error(f"Descriptions file not found for video {video_id}")
-            return None
-        
-        try:
-            with open(descriptions_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            return data
-        except Exception as e:
-            rich_console.print_error(f"Error loading descriptions for video {video_id}: {e}")
-            return None
+        result = load_json_file(descriptions_file, rich_console)
+        if result is None:
+            rich_console.print_error(f"Descriptions file not found or invalid for video {video_id}")
+        return result
     
     def _get_video_context(self, video_id):
         """Get video context information (title and channel) from metadata."""
@@ -520,97 +500,43 @@ class VideoMetadataGenerator:
         """Process metadata for multiple videos."""
         if not video_ids:
             # Get all videos that have descriptions but need metadata
-            descriptions_files = [f[:-26] for f in os.listdir(self.video_descriptions_dir) 
+            descriptions_files = [f[:-26] for f in os.listdir(self.video_descriptions_dir)
                                 if f.endswith('_descriptions_aligned.json')]
             video_ids = descriptions_files
-        
+
         total_videos = len(video_ids)
-        
         rich_console.print_component_header("Metadata Generation", f"Processing {total_videos} videos")
-        
+
         # Create rich progress bar
         progress, task_id = rich_console.create_metadata_progress(total_videos)
-        
+
         with progress:
-            results = {}
-            
             if use_concurrent and total_videos > 1 and self.max_workers > 1:
                 # Process videos concurrently
                 with ThreadPoolExecutor(max_workers=min(self.max_workers, total_videos)) as executor:
-                    # Submit all tasks
-                    futures = {executor.submit(self.process_video, vid): vid for vid in video_ids}
-                    
-                    # Process results as they complete
-                    for future in as_completed(futures):
-                        video_id = futures[future]
-                        try:
-                            result = future.result()
-                            results[video_id] = result
-                            if result:
-                                rich_console.print_success(f"✓ Completed metadata for {video_id}")
-                            else:
-                                rich_console.print_error(f"✗ Failed metadata for {video_id}")
-                            progress.update(task_id, advance=1)
-                        except Exception as e:
-                            rich_console.print_error(f"✗ Error processing video {video_id}: {e}")
-                            results[video_id] = False
-                            progress.update(task_id, advance=1)
+                    future_to_index = {
+                        executor.submit(self.process_video, vid): i
+                        for i, vid in enumerate(video_ids)
+                    }
+                    result_list = collect_concurrent_results(
+                        future_to_index, progress, task_id,
+                        error_value=False, console=rich_console
+                    )
+                # Map results back to video_ids
+                results = {vid: result_list[i] for i, vid in enumerate(video_ids)}
             else:
                 # Process videos sequentially
+                results = {}
                 for video_id in video_ids:
-                    result = self.process_video(video_id)
-                    results[video_id] = result
-                    if result:
-                        rich_console.print_success(f"✓ Completed metadata for {video_id}")
-                    else:
-                        rich_console.print_error(f"✗ Failed metadata for {video_id}")
+                    results[video_id] = self.process_video(video_id)
                     progress.update(task_id, advance=1)
-        
+
         # Summarize results
         successful = sum(1 for result in results.values() if result)
-        
         rich_console.print_completion_message("Metadata Generation", {
             'total': total_videos,
             'successful': successful,
             'duration': 0  # Duration calculated externally
         })
-        
+
         return results
-
-
-def main():
-    """Main function for testing the metadata generator."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Generate enhanced metadata from video descriptions')
-    parser.add_argument('--video-id', type=str, help='Specific video ID to process')
-    parser.add_argument('--api-base', type=str, default=LLM_SERVER_URL, help='vLLM server API base URL')
-    parser.add_argument('--model', type=str, default=LLM_MODEL, help='Language model to use')
-    parser.add_argument('--max-workers', type=int, default=4, help='Maximum number of concurrent workers')
-    parser.add_argument('--no-concurrent', action='store_true', help='Disable concurrent processing')
-    
-    args = parser.parse_args()
-    
-    # Initialize metadata generator
-    generator = VideoMetadataGenerator(
-        api_base=args.api_base,
-        model_name=args.model,
-        max_workers=args.max_workers
-    )
-    
-    use_concurrent = not args.no_concurrent
-    
-    if args.video_id:
-        # Process a single video
-        success = generator.process_video(args.video_id)
-        if success:
-            print(f"Successfully generated metadata for video {args.video_id}")
-        else:
-            print(f"Failed to generate metadata for video {args.video_id}")
-    else:
-        # Process all videos
-        generator.process_videos(use_concurrent=use_concurrent)
-
-
-if __name__ == "__main__":
-    main()

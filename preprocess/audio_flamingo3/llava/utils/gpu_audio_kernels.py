@@ -19,10 +19,10 @@ try:
     import triton
     import triton.language as tl
     TRITON_AVAILABLE = True
-    logger.info("🚀 Triton GPU kernels available")
+    logger.info("Triton GPU kernels available")
 except ImportError:
     TRITON_AVAILABLE = False
-    logger.warning("❌ Triton not available, using PyTorch fallbacks")
+    logger.warning("Triton not available, using PyTorch fallbacks")
 
 if TRITON_AVAILABLE:
     @triton.jit
@@ -263,7 +263,7 @@ class GPUAudioKernels:
     
     def benchmark_kernels(self, audio_tensor: torch.Tensor, iterations: int = 100):
         """Benchmark kernel performance"""
-        logger.info("🏁 Benchmarking GPU audio kernels...")
+        logger.info("Benchmarking GPU audio kernels...")
         
         # Warm up
         for _ in range(10):
@@ -307,7 +307,7 @@ class GPUAudioKernels:
             window_time = start_time.elapsed_time(end_time) / iterations
             logger.info(f"Windowing: {window_time:.3f}ms per call")
         
-        logger.info("✅ Kernel benchmarking completed")
+        logger.info("Kernel benchmarking completed")
 
 # Factory function for easy import
 def create_gpu_audio_kernels(device: Optional[torch.device] = None) -> GPUAudioKernels:

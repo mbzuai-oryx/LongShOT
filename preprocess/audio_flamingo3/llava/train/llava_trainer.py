@@ -460,7 +460,7 @@ def get_length_grouped_batches(
     mb = mb.reshape(num_mb, world_size, batch_size)
 
     if merge:
-        # flatten in order megabatch → replica → sample
+        # flatten in order megabatch -> replica -> sample
         return mb.reshape(-1).tolist()
     else:
         # build nested Python lists: [ [ [..], [..], … ],  … ]

@@ -20,6 +20,9 @@ from config import (CAPTIONS_DIR, VIDEO_DESCRIPTIONS_DIR, AUDIO_DESCRIPTIONS_DIR
 # Import rich console utilities
 from caption_pipeline.utils.rich_console import get_console
 
+# Import common VLM utilities
+from caption_pipeline.utils.vlm_common import load_aligned_json, load_json_file
+
 # Set up logging
 logger = logging.getLogger(__name__)
 rich_console = get_console()
@@ -68,88 +71,25 @@ class FinalConsolidator:
     
     def _load_multimodal_understanding(self, video_id: str) -> Optional[Dict]:
         """Load multimodal understanding data for a video."""
-        # Try aligned version first, then non-aligned
-        aligned_file = os.path.join(MULTIMODAL_UNDERSTANDING_DIR, f"{video_id}_multimodal_understanding_aligned.json")
-        non_aligned_file = os.path.join(MULTIMODAL_UNDERSTANDING_DIR, f"{video_id}_multimodal_understanding.json")
-        
-        try:
-            if os.path.exists(aligned_file):
-                with open(aligned_file, 'r', encoding='utf-8') as f:
-                    logger.debug(f"Using aligned multimodal understanding for {video_id}")
-                    return json.load(f)
-            elif os.path.exists(non_aligned_file):
-                logger.debug(f"Using non-aligned multimodal understanding for {video_id}")
-                with open(non_aligned_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            else:
-                logger.debug(f"No multimodal understanding for {video_id}")
-                return None
-        except Exception as e:
-            logger.debug(f"Error loading multimodal understanding for {video_id}: {e}")
-            return None
+        base_path = os.path.join(MULTIMODAL_UNDERSTANDING_DIR, f"{video_id}_multimodal_understanding")
+        return load_aligned_json(base_path)
     
     def _load_key_events(self, video_id: str) -> Optional[Dict]:
         """Load key events data for a video from the separate key events directory."""
-        key_events_file = os.path.join(KEY_EVENTS_DIR, f"{video_id}_key_events.json")
-        
-        try:
-            if os.path.exists(key_events_file):
-                with open(key_events_file, 'r', encoding='utf-8') as f:
-                    logger.debug(f"Using key events data for {video_id}")
-                    return json.load(f)
-            else:
-                logger.debug(f"No key events data for {video_id}")
-                return None
-        except Exception as e:
-            logger.debug(f"Error loading key events for {video_id}: {e}")
-            return None
+        return load_json_file(os.path.join(KEY_EVENTS_DIR, f"{video_id}_key_events.json"))
     
     def _load_captions_data(self, video_id: str) -> Optional[Dict]:
         """Load caption data for a video."""
-        file_path = os.path.join(CAPTIONS_DIR, f"{video_id}.json")
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            logger.debug(f"No captions for {video_id}: {e}")
-            return None
+        return load_json_file(os.path.join(CAPTIONS_DIR, f"{video_id}.json"))
     
     def _load_video_descriptions(self, video_id: str) -> Optional[Dict]:
         """Load video descriptions data for a video."""
-        file_path = os.path.join(VIDEO_DESCRIPTIONS_DIR, f"{video_id}_descriptions_aligned.json")
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            logger.debug(f"No video descriptions for {video_id}: {e}")
-            return None
+        return load_json_file(os.path.join(VIDEO_DESCRIPTIONS_DIR, f"{video_id}_descriptions_aligned.json"))
     
     def _load_audio_descriptions(self, video_id: str) -> Optional[Dict]:
         """Load audio descriptions data for a video, preferring aligned files."""
-        # First try to load aligned audio descriptions
-        aligned_file_path = os.path.join(AUDIO_DESCRIPTIONS_DIR, f"{video_id}_audio_descriptions_aligned.json")
-        file_path = os.path.join(AUDIO_DESCRIPTIONS_DIR, f"{video_id}_audio_descriptions.json")
-        
-        # Prefer aligned file if it exists
-        if os.path.exists(aligned_file_path):
-            try:
-                with open(aligned_file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    logger.debug(f"Loaded aligned audio descriptions for {video_id}")
-                    return data
-            except Exception as e:
-                logger.warning(f"Failed to load aligned audio descriptions for {video_id}: {e}")
-                # Fall back to original file
-        
-        # Fall back to original audio descriptions file
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                logger.debug(f"Loaded original audio descriptions for {video_id}")
-                return data
-        except Exception as e:
-            logger.debug(f"No audio descriptions for {video_id}: {e}")
-            return None
+        base_path = os.path.join(AUDIO_DESCRIPTIONS_DIR, f"{video_id}_audio_descriptions")
+        return load_aligned_json(base_path)
     
     def _create_fallback_segments(self, captions_data: Dict, video_descriptions_data: Dict, 
                                  audio_descriptions_data: Dict) -> List[Dict]:
@@ -226,19 +166,28 @@ class FinalConsolidator:
         categories = []
         if video_meta.get('content_categories'):
             categories = [cat.strip() for cat in video_meta.get('content_categories', '').split(',') if cat.strip()]
-        
-        # Calculate statistics
-        total_duration = sum(seg.get('duration', 0) for seg in segments)
-        speech_segments = sum(1 for seg in segments if seg.get('speech_content', ''))
-        visual_segments = sum(1 for seg in segments if seg.get('visual_description', ''))
-        audio_segments = sum(1 for seg in segments if seg.get('audio_environment', ''))
-        multimodal_segments = sum(1 for seg in segments if seg.get('multimodal_understanding'))
-        key_events_segments = sum(1 for seg in segments if seg.get('key_events'))
-        total_key_events = sum(len(seg.get('key_events', [])) for seg in segments)
+
+        # Calculate statistics in a single pass
+        stats = {'duration': 0, 'speech': 0, 'visual': 0, 'audio': 0, 'multimodal': 0, 'key_events': 0, 'total_events': 0}
+        for seg in segments:
+            stats['duration'] += seg.get('duration', 0)
+            if seg.get('speech_content', ''):
+                stats['speech'] += 1
+            if seg.get('visual_description', ''):
+                stats['visual'] += 1
+            if seg.get('audio_environment', ''):
+                stats['audio'] += 1
+            if seg.get('multimodal_understanding'):
+                stats['multimodal'] += 1
+            key_events = seg.get('key_events', [])
+            if key_events:
+                stats['key_events'] += 1
+                stats['total_events'] += len(key_events)
         
         # Create segment entries
         segment_entries = [self._create_segment_entry(seg) for seg in segments]
         
+        num_segments = len(segments)
         return {
             'video_id': video_id,
             'video': {
@@ -253,41 +202,41 @@ class FinalConsolidator:
             },
             'segments': segment_entries,
             'statistics': {
-                'total_segments': len(segments),
-                'total_processed_duration': total_duration,
-                'segments_with_speech': speech_segments,
-                'segments_with_visual': visual_segments,
-                'segments_with_audio_env': audio_segments,
-                'segments_with_multimodal': multimodal_segments,
-                'segments_with_key_events': key_events_segments,
-                'total_key_events': total_key_events,
-                'avg_key_events_per_segment': total_key_events / len(segments) if segments else 0,
+                'total_segments': num_segments,
+                'total_processed_duration': stats['duration'],
+                'segments_with_speech': stats['speech'],
+                'segments_with_visual': stats['visual'],
+                'segments_with_audio_env': stats['audio'],
+                'segments_with_multimodal': stats['multimodal'],
+                'segments_with_key_events': stats['key_events'],
+                'total_key_events': stats['total_events'],
+                'avg_key_events_per_segment': stats['total_events'] / num_segments if num_segments else 0,
                 'completeness_ratio': {
-                    'speech': speech_segments / len(segments) if segments else 0,
-                    'visual': visual_segments / len(segments) if segments else 0,
-                    'audio_environment': audio_segments / len(segments) if segments else 0,
-                    'multimodal': multimodal_segments / len(segments) if segments else 0,
-                    'key_events': key_events_segments / len(segments) if segments else 0
+                    'speech': stats['speech'] / num_segments if num_segments else 0,
+                    'visual': stats['visual'] / num_segments if num_segments else 0,
+                    'audio_environment': stats['audio'] / num_segments if num_segments else 0,
+                    'multimodal': stats['multimodal'] / num_segments if num_segments else 0,
+                    'key_events': stats['key_events'] / num_segments if num_segments else 0
                 }
             },
             'meta': {
                 'consolidated_at': datetime.now().isoformat(),
-                'has_multimodal_understanding': multimodal_segments > 0,
-                'has_key_events': key_events_segments > 0,
-                'data_source_priority': 'multimodal_understanding' if multimodal_segments > 0 else 'individual_modalities'
+                'has_multimodal_understanding': stats['multimodal'] > 0,
+                'has_key_events': stats['key_events'] > 0,
+                'data_source_priority': 'multimodal_understanding' if stats['multimodal'] > 0 else 'individual_modalities'
             }
         }
     
     
-    def consolidate_video(self, video_id: str) -> bool:
+    def consolidate_video(self, video_id: str) -> Optional[Dict]:
         """
         Consolidate all data for a single video into a JSONL file.
-        
+
         Args:
             video_id: ID of the video to consolidate
-            
+
         Returns:
-            bool: True if successful, False otherwise
+            Dict with video JSON if successful, None otherwise
         """
         try:
             # Get video metadata
@@ -338,7 +287,7 @@ class FinalConsolidator:
             
             if not segments:
                 rich_console.print_warning(f"No segments found for video {video_id}")
-                return False
+                return None
             
             # Create complete video JSON structure
             video_json = self._create_video_json(video_id, segments, video_meta)
@@ -348,13 +297,12 @@ class FinalConsolidator:
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(video_json, f, indent=2, ensure_ascii=False)
             
-            rich_console.print_success(f"✨ Individual JSON: {video_id} → {len(segments)} segments")
+            rich_console.print_success(f"Individual JSON: {video_id} -> {len(segments)} segments")
             return video_json
             
         except Exception as e:
             rich_console.print_error(f"Error consolidating video {video_id}: {e}")
-            logger.error(f"Error consolidating video {video_id}: {e}")
-            return False
+            return None
     
     def consolidate_all_videos(self, video_ids: Optional[List[str]] = None, 
                               max_videos: Optional[int] = None) -> Dict[str, bool]:
@@ -395,21 +343,21 @@ class FinalConsolidator:
                 for video_id in video_ids:
                     progress.update(task_id, status=f"Consolidating {video_id}...")
                     video_json = self.consolidate_video(video_id)
-                    success = video_json is not False
+                    success = video_json is not None
                     results[video_id] = success
-                    
+
                     if success:
                         video_jsons.append(video_json)
                     
-                    status = "✓ Completed" if success else "✗ Failed"
+                    status = "[OK] Completed" if success else "[X] Failed"
                     progress.update(task_id, advance=1, status=f"{video_id}: {status}")
         else:
             # Single video processing
             for video_id in video_ids:
                 video_json = self.consolidate_video(video_id)
-                success = video_json is not False
+                success = video_json is not None
                 results[video_id] = success
-                
+
                 if success:
                     video_jsons.append(video_json)
         
@@ -422,16 +370,16 @@ class FinalConsolidator:
                 for video_json in video_jsons:
                     f.write(json.dumps(video_json, ensure_ascii=False) + '\n')
             
-            rich_console.print_success(f"📚 Combined JSONL: {len(video_jsons)} videos → {combined_jsonl_file}")
+            rich_console.print_success(f"Combined JSONL: {len(video_jsons)} videos -> {combined_jsonl_file}")
         
         # Summary
         successful = sum(1 for success in results.values() if success)
         total = len(results)
         
         if successful == total:
-            rich_console.print_success(f"🎯 Final consolidation complete: {successful}/{total} videos processed successfully")
+            rich_console.print_success(f"Final consolidation complete: {successful}/{total} videos processed successfully")
         else:
-            rich_console.print_warning(f"⚠️  Final consolidation complete: {successful}/{total} videos processed successfully, {total - successful} failed")
+            rich_console.print_warning(f"Final consolidation complete: {successful}/{total} videos processed successfully, {total - successful} failed")
         
         return results
     

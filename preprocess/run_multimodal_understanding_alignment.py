@@ -7,10 +7,9 @@ temporal continuity between consecutive segments.
 
 import os
 import sys
-import argparse
 import logging
 import time
-from typing import List, Dict
+from typing import List
 
 from caption_pipeline.utils.rich_console import get_console
 
@@ -85,7 +84,7 @@ def run_multimodal_understanding_alignment(video_ids: List[str] = None, max_vide
             max_workers=max_workers
         )
         init_time = time.time() - init_start
-        rich_console.print_success(f"✨ Multimodal understanding aligner initialized in {init_time:.1f}s")
+        rich_console.print_success(f"Multimodal understanding aligner initialized in {init_time:.1f}s")
     except Exception as e:
         rich_console.print_error(f"Failed to initialize multimodal understanding aligner: {e}")
         return []
@@ -124,51 +123,3 @@ def run_multimodal_understanding_alignment(video_ids: List[str] = None, max_vide
     return aligned_files
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Align multimodal understanding for temporal continuity')
-    parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
-    parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers (default: 8)')
-    parser.add_argument('--model', type=str, help='Language model to use (defaults to config)')
-    parser.add_argument('--api-base', type=str, help='vLLM server API base URL (defaults to config)')
-    parser.add_argument('--list-only', action='store_true', help='Only list videos that need alignment processing')
-    
-    args = parser.parse_args()
-    
-    if args.list_only:
-        # Show videos that need alignment processing
-        try:
-            from caption_pipeline.pipeline.multimodal_understanding_aligner import MultimodalUnderstandingAligner
-            from config import MULTIMODAL_UNDERSTANDING_DIR
-            
-            # Find files that need alignment
-            files_to_process = []
-            if os.path.exists(MULTIMODAL_UNDERSTANDING_DIR):
-                for filename in os.listdir(MULTIMODAL_UNDERSTANDING_DIR):
-                    if filename.endswith('_multimodal_understanding.json') and not filename.endswith('_aligned.json'):
-                        files_to_process.append(filename.replace('_multimodal_understanding.json', ''))
-            
-            if files_to_process:
-                rich_console.print_info(f"📋 Videos needing multimodal understanding alignment ({len(files_to_process)}):")
-                for i, video_id in enumerate(files_to_process, 1):
-                    rich_console.console.print(f"  [dim]{i:2d}.[/] [cyan]{video_id}[/]")
-            else:
-                rich_console.print_success("✅ No videos need multimodal understanding alignment")
-                
-        except Exception as e:
-            rich_console.print_error(f"Error checking videos: {e}")
-    else:
-        # Run alignment processing
-        aligned_files = run_multimodal_understanding_alignment(
-            video_ids=args.video_ids,
-            max_videos=args.max_videos,
-            max_workers=args.max_workers,
-            model_name=args.model,
-            api_base=args.api_base
-        )
-        
-        # Print final summary
-        if aligned_files:
-            rich_console.print_success(f"🎉 Final Results: {len(aligned_files)} multimodal understanding files aligned successfully")
-        else:
-            rich_console.print_warning("⚠️  No multimodal understanding files were aligned")

@@ -338,8 +338,8 @@ class ModelManager:
                 
                 # Print individual result
                 speed_info = f" (Speed: {item.get('speed_factor', 2.0)}x)" if item.get('speed_factor', 2.0) != 1.0 else ""
-                print(f"🎵 {item['audio_path']}{speed_info}: {response}")
-                print(f"   ⏱️  Inference time: {inference_time:.3f}s")
+                print(f"{item['audio_path']}{speed_info}: {response}")
+                print(f"   Inference time: {inference_time:.3f}s")
                 
             except Exception as e:
                 logger.error(f"Inference error for {item['audio_path']}: {str(e)}")

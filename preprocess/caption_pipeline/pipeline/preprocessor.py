@@ -1,5 +1,5 @@
 """
-Video preprocessor module for the Arabic video dataset.
+Video preprocessor module for the LongShOT video dataset.
 This module handles preprocessing of downloaded videos, including audio extraction.
 """
 
@@ -62,22 +62,30 @@ class VideoPreprocessor:
         
         # Initialize the metadata DataFrame
         self.metadata_file = os.path.join(self.metadata_dir, 'video_metadata.csv')
-        
+
+        # Define required columns
+        required_columns = [
+            'video_id', 'title', 'channel', 'duration', 'view_count',
+            'publish_date', 'description', 'tags', 'download_date',
+            'file_path', 'status', 'audio_path', 'caption_path'
+        ]
+
         try:
-            if os.path.exists(self.metadata_file):
+            if os.path.exists(self.metadata_file) and os.path.getsize(self.metadata_file) > 0:
                 self.metadata_df = pd.read_csv(self.metadata_file)
                 rich_console.print_info(f"Loaded metadata for {len(self.metadata_df)} videos")
             else:
                 # Create an empty metadata file with the required columns
-                rich_console.print_warning(f"Metadata file not found. Creating empty metadata file at {self.metadata_file}")
-                columns = [
-                    'video_id', 'title', 'channel', 'duration', 'view_count',
-                    'publish_date', 'description', 'tags', 'download_date',
-                    'file_path', 'status', 'audio_path', 'caption_path'
-                ]
-                self.metadata_df = pd.DataFrame(columns=columns)
+                rich_console.print_warning(f"Metadata file not found or empty. Creating metadata file at {self.metadata_file}")
+                self.metadata_df = pd.DataFrame(columns=required_columns)
                 self.metadata_df.to_csv(self.metadata_file, index=False)
                 rich_console.print_info("Created empty metadata file")
+        except pd.errors.EmptyDataError:
+            # Handle empty or malformed CSV file
+            rich_console.print_warning("Metadata file was empty or malformed. Recreating...")
+            self.metadata_df = pd.DataFrame(columns=required_columns)
+            self.metadata_df.to_csv(self.metadata_file, index=False)
+            rich_console.print_info("Recreated metadata file")
         except Exception as e:
             rich_console.print_error(f"Error initializing metadata: {e}")
             raise

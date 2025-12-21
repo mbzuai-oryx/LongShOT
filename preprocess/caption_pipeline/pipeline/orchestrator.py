@@ -1,5 +1,5 @@
 """
-Parallel pipeline orchestrator for the Arabic video dataset processing.
+Parallel pipeline orchestrator for the LongShOT video dataset processing.
 This module enables concurrent processing across all pipeline stages.
 """
 
@@ -9,30 +9,26 @@ import time
 import queue
 import threading
 import logging
-from typing import List, Dict, Any, Optional, Tuple, Set
+from typing import List, Optional, Tuple
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor
-import torch
-
-# Import simple console
-from caption_pipeline.simple_console import pipeline_console, update_video_status, log_message
 
 # Import other pipeline components
 from caption_pipeline.pipeline.downloader import VideoDownloader
 from caption_pipeline.pipeline.preprocessor import VideoPreprocessor
-from caption_pipeline.pipeline.caption_generator import CaptionGenerator, EnhancedCaptionGenerator
-from caption_pipeline.models.movie_caption_enhancer import MovieCaptionEnhancer
+from caption_pipeline.pipeline.caption_generator import CaptionGenerator
 
 # Import project configuration
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from config import AUDIO_FLAMINGO_MODEL_PATH, METADATA_DIR, VIDEO_DIR, AUDIO_DIR
+from config import METADATA_DIR, VIDEO_DIR, AUDIO_DIR
 
 # Import rich console utilities
 from caption_pipeline.utils.rich_console import get_console
 
 # Import model cleanup utilities
 from caption_pipeline.utils.model_cleanup import model_cleanup_manager
+
+# Import common VLM utilities
+from caption_pipeline.utils.vlm_common import safe_remove_file
 
 # Set up logging
 logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'logs')
@@ -54,11 +50,17 @@ class StageStatus:
     COMPLETED = "completed"
     FAILED = "failed"
 
+# Pipeline monitoring constants
+STALL_DETECTION_THRESHOLD = 30  # Cycles before detecting stall (~5 minutes with 10s sleep)
+COMPLETION_CHECK_CYCLES = 3  # Consecutive empty cycles before finishing
+MONITOR_SLEEP_INTERVAL = 10  # Seconds between monitoring cycles
+
+
 class PipelineOrchestrator:
     """Parallel pipeline orchestrator for processing videos through all stages concurrently."""
     
-    def __init__(self, 
-                 max_videos: Optional[int] = None, 
+    def __init__(self,
+                 max_videos: Optional[int] = None,
                  download_workers: int = 4,
                  preprocess_workers: int = 4,
                  caption_workers: int = 2,
@@ -66,14 +68,9 @@ class PipelineOrchestrator:
                  whisper_model_size: str = 'large-v3',
                  whisper_compute_type: str = 'float16',
                  whisper_batch_size: int = 16,
-                 enhanced_captions: bool = False,
-                 movie_style: bool = True,
-                 visual_context: bool = True,
-                 enable_video_descriptions: bool = False,
-                 enable_audio_descriptions: bool = False,
-                 audio_flamingo_model_path: str = AUDIO_FLAMINGO_MODEL_PATH):
+                 **kwargs):
         """Initialize the pipeline orchestrator with configurable worker counts.
-        
+
         Args:
             max_videos: Maximum number of videos to process (None for no limit)
             download_workers: Number of worker threads for downloading videos
@@ -83,12 +80,6 @@ class PipelineOrchestrator:
             whisper_model_size: Size of the Whisper model to use
             whisper_compute_type: Compute type for Whisper (e.g., 'float16', 'int8')
             whisper_batch_size: Batch size for Whisper captioning
-            enhanced_captions: Whether to use enhanced caption generation (with movie-style and visual context)
-            movie_style: Whether to include movie-style features like [music], [effects], etc.
-            visual_context: Whether to use visual context detection (CLIP only)
-            enable_video_descriptions: Whether to generate video descriptions alongside captions
-            enable_audio_descriptions: Whether to generate audio descriptions using Audio Flamingo 3
-            audio_flamingo_model_path: Path to Audio Flamingo 3 model
         """
         # Configuration settings
         self.max_videos = max_videos
@@ -111,18 +102,9 @@ class PipelineOrchestrator:
         self.whisper_batch_size = whisper_batch_size
         self.device = "cuda"
         
-        # Enhanced captioning options
-        self.enhanced_captions = enhanced_captions
-        self.movie_style = movie_style
-        self.visual_context = visual_context
-        self.enable_video_descriptions = enable_video_descriptions
-        self.enable_audio_descriptions = enable_audio_descriptions
-        self.audio_flamingo_model_path = audio_flamingo_model_path
-        
         # Lazy initialization flags
         self._preprocessor = None
         self._caption_generator = None
-        self._audio_descriptor = None
         
         # Initialize processing queues
         self.download_queue = queue.Queue()
@@ -148,9 +130,17 @@ class PipelineOrchestrator:
         # Lock for component initialization
         self.init_lock = threading.RLock()
         
-        # Metadata file path
+        # Metadata file path and DataFrame
         self.metadata_file = os.path.join(METADATA_DIR, 'video_metadata.csv')
-        
+        # Initialize metadata DataFrame - load from file if exists, else empty
+        if os.path.exists(self.metadata_file):
+            try:
+                self.metadata_df = pd.read_csv(self.metadata_file)
+            except Exception:
+                self.metadata_df = pd.DataFrame()
+        else:
+            self.metadata_df = pd.DataFrame()
+
         # Add maximum processing time per stage
         self.max_stage_processing_time = {
             'download': 3600,  # 1 hour max for downloads
@@ -199,98 +189,61 @@ class PipelineOrchestrator:
                 try:
                     # Initialize caption generator
                     self.rich_console.print_info(f"Initializing Whisper model ({self.whisper_model_size}) - this may take a moment...")
-                    
-                    if self.enhanced_captions:
-                        # Initialize enhanced caption generator
-                        self.rich_console.print_info("Loading enhanced caption generator with movie-style features...")
-                        self._caption_generator = EnhancedCaptionGenerator(
-                            whisper_model=self.whisper_model_size,
-                            device=self.device,
-                            enable_movie_style=self.movie_style or self.visual_context,  # Enable if either feature is requested
-                            enable_segment_splitting=True,
-                            enable_video_descriptions=self.enable_video_descriptions,
-                            max_segment_length=42,
-                            min_segment_duration=1.0
-                        )
-                        self.rich_console.print_success("Enhanced caption generator initialized with movie-style features")
-                    else:
-                        # Initialize base caption generator
-                        self.rich_console.print_info("Loading base caption generator...")
-                        self._caption_generator = CaptionGenerator(
-                            model_size=self.whisper_model_size,
-                            device=self.device,
-                            compute_type=self.whisper_compute_type,
-                            batch_size=self.whisper_batch_size
-                        )
-                        self.rich_console.print_success("Base caption generator initialized and ready")
+                    self._caption_generator = CaptionGenerator(
+                        model_size=self.whisper_model_size,
+                        device=self.device,
+                        compute_type=self.whisper_compute_type,
+                        batch_size=self.whisper_batch_size
+                    )
+                    self.rich_console.print_success("Caption generator initialized and ready")
                     
                 except Exception as e:
                     self.rich_console.print_error(f"Failed to initialize caption generator: {e}")
                     raise
             return self._caption_generator
-    
-    @property
-    def audio_descriptor(self):
-        """Lazy initialization of the audio descriptor."""
-        if not self.enable_audio_descriptions:
-            return None
-            
-        with self.init_lock:
-            if self._audio_descriptor is None:
-                try:
-                    self.rich_console.print_info("Initializing Audio Flamingo 3 audio descriptor...")
-                    
-                    # Import here to avoid circular imports and only when needed
-                    from caption_pipeline.pipeline.audio_descriptor import AudioDescriptor
-                    
-                    self._audio_descriptor = AudioDescriptor(
-                        model_path=self.audio_flamingo_model_path,
-                        batch_size=8,  # Conservative batch size
-                        num_gpus=1 if torch.cuda.is_available() else None
-                    )
-                    self.rich_console.print_success("Audio descriptor initialized successfully")
-                except Exception as e:
-                    self.rich_console.print_error(f"Failed to initialize audio descriptor: {e}")
-                    raise
-            return self._audio_descriptor
-    
+
     def _sync_metadata(self):
         """Reload metadata file to ensure we have the latest updates."""
         try:
-            # Re-read metadata file
-            if os.path.exists(self.metadata_file):
-                metadata_df = pd.read_csv(self.metadata_file)
-                
-                # Update any newly downloaded videos that might not be in the metadata yet
-                with self.download_lock:
-                    for video_id, info in self.downloaded_videos.items():
-                        video_idx = metadata_df[metadata_df['video_id'] == video_id].index
-                        if len(video_idx) == 0:
-                            # Add new row for this video
-                            new_row = {
-                                'video_id': video_id,
-                                'file_path': info['file_path'],
-                                'status': 'downloaded',
-                                'download_date': pd.Timestamp.now().strftime('%Y-%m-%d')
-                            }
-                            metadata_df = pd.concat([metadata_df, pd.DataFrame([new_row])], ignore_index=True)
-                        elif metadata_df.loc[video_idx[0], 'status'] != 'downloaded':
-                            # Update existing row
-                            metadata_df.loc[video_idx[0], 'file_path'] = info['file_path']
-                            metadata_df.loc[video_idx[0], 'status'] = 'downloaded'
-                            metadata_df.loc[video_idx[0], 'download_date'] = pd.Timestamp.now().strftime('%Y-%m-%d')
-                    
-                    # Save updated metadata if changes were made
-                    if self.downloaded_videos:
-                        metadata_df.to_csv(self.metadata_file, index=False)
-                        self.downloaded_videos = {}  # Clear after saving
-                
-                # Return the updated metadata
-                return metadata_df
-                
+            # Re-read metadata file (check size to avoid reading empty/truncated files)
+            if not os.path.exists(self.metadata_file) or os.path.getsize(self.metadata_file) == 0:
+                return pd.DataFrame()
+
+            metadata_df = pd.read_csv(self.metadata_file)
+
+            # Update any newly downloaded videos that might not be in the metadata yet
+            with self.download_lock:
+                for video_id, info in self.downloaded_videos.items():
+                    video_idx = metadata_df[metadata_df['video_id'] == video_id].index
+                    if len(video_idx) == 0:
+                        # Add new row for this video
+                        new_row = {
+                            'video_id': video_id,
+                            'file_path': info['file_path'],
+                            'status': 'downloaded',
+                            'download_date': pd.Timestamp.now().strftime('%Y-%m-%d')
+                        }
+                        metadata_df = pd.concat([metadata_df, pd.DataFrame([new_row])], ignore_index=True)
+                    elif metadata_df.loc[video_idx[0], 'status'] != 'downloaded':
+                        # Update existing row
+                        metadata_df.loc[video_idx[0], 'file_path'] = info['file_path']
+                        metadata_df.loc[video_idx[0], 'status'] = 'downloaded'
+                        metadata_df.loc[video_idx[0], 'download_date'] = pd.Timestamp.now().strftime('%Y-%m-%d')
+
+                # Save updated metadata if changes were made
+                if self.downloaded_videos:
+                    metadata_df.to_csv(self.metadata_file, index=False)
+                    self.downloaded_videos = {}  # Clear after saving
+
+            # Return the updated metadata
+            return metadata_df
+
+        except pd.errors.EmptyDataError:
+            # Handle empty or malformed CSV file gracefully
+            return pd.DataFrame()
         except Exception as e:
             self.rich_console.print_error(f"Error syncing metadata: {e}")
-        
+
         # Return empty DataFrame if we couldn't load metadata
         return pd.DataFrame()
     
@@ -394,12 +347,8 @@ class PipelineOrchestrator:
             # Force clear any partial results for caption generation
             if stage == 'caption':
                 partial_path = os.path.join(self.caption_generator.captions_dir, f"{video_id}_partial.json")
-                if os.path.exists(partial_path):
-                    try:
-                        os.remove(partial_path)
-                        self.rich_console.print_info(f"Removed partial caption file for timed out video: {video_id}")
-                    except:
-                        pass
+                if safe_remove_file(partial_path):
+                    self.rich_console.print_info(f"Removed partial caption file for timed out video: {video_id}")
         
         return len(stuck_videos) > 0
     
@@ -433,27 +382,24 @@ class PipelineOrchestrator:
         # Print enhanced pipeline header with configuration details
         self.rich_console.print_header(
             "Parallel Video Processing Pipeline",
-            "Processing videos through download → preprocess → caption stages"
+            "Processing videos through download -> preprocess -> caption stages"
         )
-        
-        # Display pipeline configuration
-        self._print_pipeline_configuration()
-        
+
         # Initialize video IDs and tracking with detailed feedback
         self.rich_console.print_info("Discovering and validating video IDs...")
         video_ids = self._load_video_ids()
         if not video_ids:
             self.rich_console.print_error("No video IDs found to process")
             return (0, 0, 0)
-        
-        # Print video discovery results (consolidated message)
+
+        # Print video discovery results
         if self.max_videos and len(video_ids) > self.max_videos:
             self.rich_console.print_success(f"Found {len(video_ids)} video IDs, limited to {self.max_videos} as requested")
         else:
             self.rich_console.print_success(f"Found {len(video_ids)} video IDs to process")
-        
-        # Check for already processed videos
-        self._print_processing_status_summary(video_ids)
+
+        # Display pipeline configuration and existing progress
+        self._print_startup_info(video_ids)
         
         self._init_progress_tracking(video_ids)
         self.rich_console.print_important_info(f"Processing {len(video_ids)} videos through the pipeline")
@@ -500,8 +446,8 @@ class PipelineOrchestrator:
                         last_completed_count = completed_count
                         last_failed_count = failed_count
                     
-                    if stalled_counter >= 300000000:
-                        self.rich_console.print_warning(f"Pipeline appears stalled for {stalled_counter * 5}s. "
+                    if stalled_counter >= STALL_DETECTION_THRESHOLD:
+                        self.rich_console.print_warning(f"Pipeline appears stalled for {stalled_counter * MONITOR_SLEEP_INTERVAL}s. "
                                      f"Checking for stuck videos.")
                         self._print_status_summary()
                         
@@ -541,7 +487,7 @@ class PipelineOrchestrator:
                     # Use the new method to double-check if all videos are truly processed
                     if self._are_all_videos_processed():
                         timeout_counter += 1
-                        if timeout_counter >= 3:  # Check for 3 consecutive cycles to be sure
+                        if timeout_counter >= COMPLETION_CHECK_CYCLES:
                             self.rich_console.print_info("All queues empty and no pending tasks, finishing pipeline")
                             break
                     else:
@@ -558,8 +504,8 @@ class PipelineOrchestrator:
                 if elapsed_time % 15 < 5:  # Only print every 15 seconds
                     self._print_status_summary()
                 
-                # Sleep to avoid high CPU usage - increased interval
-                time.sleep(10)  # Increased from 5 to 10 seconds
+                # Sleep to avoid high CPU usage
+                time.sleep(MONITOR_SLEEP_INTERVAL)
             
         except KeyboardInterrupt:
             self.rich_console.print_warning("Pipeline interrupted by user")
@@ -822,30 +768,6 @@ class PipelineOrchestrator:
         self.rich_console.print_info("Pipeline is now active and processing videos...")
         self.rich_console.print_info("")
     
-    def _monitor_progress(self):
-        """Monitor and report progress of the pipeline."""
-        while not self.shutdown_event.is_set():
-            try:
-                with self.status_lock:
-                    completed = len(self.completed_videos)
-                    failed = len(self.failed_videos)
-                    active = len(self.active_videos)
-                    
-                    # Update console stats instead of using progress_bar
-                    self.rich_console.update_stats(completed=completed, failed=failed)
-                
-                # Check if all videos are processed (completed or failed)
-                if completed + failed >= self.total_videos:
-                    self.rich_console.print_info("All videos processed, stopping progress monitor")
-                    break
-                
-                # Sleep to avoid high CPU usage
-                time.sleep(5)  # Increased sleep time
-                
-            except Exception as e:
-                self.rich_console.print_error(f"Progress monitor error: {str(e)}")
-                time.sleep(10)  # Longer sleep on error
-    
     def _is_video_downloaded(self, video_id: str) -> bool:
         """Check if a video has already been downloaded."""
         # Check metadata for downloaded status
@@ -899,11 +821,8 @@ class PipelineOrchestrator:
         partial_path = os.path.join(self.caption_generator.captions_dir, f"{video_id}_partial.json")
         if os.path.exists(partial_path):
             # Remove stale partial file and treat as not captioned
-            try:
-                os.remove(partial_path)
+            if safe_remove_file(partial_path):
                 self.rich_console.print_info(f"Removed stale partial caption file for {video_id}")
-            except:
-                pass
             return False
         
         return False
@@ -947,140 +866,38 @@ class PipelineOrchestrator:
             # If we got here, all videos are either completed or failed
             return True
     
-    def _print_pipeline_configuration(self):
-        """Print detailed pipeline configuration."""
+    def _print_startup_info(self, video_ids: List[str]):
+        """Print pipeline configuration and existing processing status."""
+        # Pipeline configuration
         self.rich_console.print_info("Pipeline Configuration:")
-        self.rich_console.print_info(f"  • Download workers: {self.download_workers}")
-        self.rich_console.print_info(f"  • Preprocessing workers: {self.preprocess_workers}")
-        self.rich_console.print_info(f"  • Caption workers: {self.caption_workers}")
-        self.rich_console.print_info(f"  • Audio output format: {self.output_format}")
-        self.rich_console.print_info(f"  • Whisper model: {self.whisper_model_size} ({self.whisper_compute_type})")
-        self.rich_console.print_info(f"  • Enhanced captions: {'enabled' if self.enhanced_captions else 'disabled'}")
-        if self.enhanced_captions:
-            self.rich_console.print_info(f"    - Movie-style features: {'enabled' if self.movie_style else 'disabled'}")
-            self.rich_console.print_info(f"    - Visual context: {'enabled' if self.visual_context else 'disabled'}")
-        self.rich_console.print_info(f"  • Audio descriptions: {'enabled' if self.enable_audio_descriptions else 'disabled'}")
-        if self.enable_audio_descriptions:
-            self.rich_console.print_info(f"    - Audio Flamingo model: {self.audio_flamingo_model_path}")
-        self.rich_console.print_info(f"  • Device: {self.device}")
+        self.rich_console.print_info(f"  - Download workers: {self.download_workers}")
+        self.rich_console.print_info(f"  - Preprocessing workers: {self.preprocess_workers}")
+        self.rich_console.print_info(f"  - Caption workers: {self.caption_workers}")
+        self.rich_console.print_info(f"  - Audio output format: {self.output_format}")
+        self.rich_console.print_info(f"  - Whisper model: {self.whisper_model_size} ({self.whisper_compute_type})")
+        self.rich_console.print_info(f"  - Device: {self.device}")
         if self.max_videos:
-            self.rich_console.print_info(f"  • Maximum videos: {self.max_videos}")
+            self.rich_console.print_info(f"  - Maximum videos: {self.max_videos}")
+
+        # Existing processing status
+        already_downloaded = sum(1 for v in video_ids if self._is_video_downloaded(v))
+        already_preprocessed = sum(1 for v in video_ids if self._is_audio_extracted(v))
+        already_captioned = sum(1 for v in video_ids if self._is_video_captioned(v))
+
+        if already_downloaded > 0 or already_preprocessed > 0 or already_captioned > 0:
+            self.rich_console.print_info("Existing Progress:")
+            if already_downloaded > 0:
+                self.rich_console.print_info(f"  - {already_downloaded} videos already downloaded")
+            if already_preprocessed > 0:
+                self.rich_console.print_info(f"  - {already_preprocessed} videos already preprocessed")
+            if already_captioned > 0:
+                self.rich_console.print_info(f"  - {already_captioned} videos already captioned")
+
+        remaining = len(video_ids) - already_captioned
+        if remaining < len(video_ids):
+            self.rich_console.print_info(f"  - {remaining} videos require processing")
         self.rich_console.print_info("")
-    
-    def _print_processing_status_summary(self, video_ids: List[str]):
-        """Print summary of what videos are already processed."""
-        self.rich_console.print_info("Checking existing processing status...")
-        
-        already_downloaded = 0
-        already_preprocessed = 0
-        already_captioned = 0
-        
-        for video_id in video_ids:
-            if self._is_video_downloaded(video_id):
-                already_downloaded += 1
-            if self._is_audio_extracted(video_id):
-                already_preprocessed += 1
-            if self._is_video_captioned(video_id):
-                already_captioned += 1
-        
-        if already_downloaded > 0:
-            self.rich_console.print_info(f"  • {already_downloaded} videos already downloaded")
-        if already_preprocessed > 0:
-            self.rich_console.print_info(f"  • {already_preprocessed} videos already preprocessed")
-        if already_captioned > 0:
-            self.rich_console.print_info(f"  • {already_captioned} videos already captioned")
-        
-        remaining_to_process = len(video_ids) - already_captioned
-        if remaining_to_process < len(video_ids):
-            self.rich_console.print_info(f"  • {remaining_to_process} videos require processing")
-        else:
-            self.rich_console.print_info(f"  • All {len(video_ids)} videos require full processing")
-        
-        self.rich_console.print_info("")
-    
-    def run_audio_descriptions(self, video_ids: Optional[List[str]] = None) -> Tuple[int, int]:
-        """
-        Run audio descriptions for videos that have completed video descriptions.
-        
-        Args:
-            video_ids: Optional list of specific video IDs to process
-            
-        Returns:
-            Tuple of (successful_count, failed_count)
-        """
-        if not self.enable_audio_descriptions:
-            self.rich_console.print_info("Audio descriptions disabled, skipping")
-            return (0, 0)
-        
-        self.rich_console.print_component_header("Audio Description Generation", 
-                                               "Processing videos with Audio Flamingo 3")
-        
-        # Initialize audio descriptions directory path (lazy)
-        if not hasattr(self, 'audio_descriptions_dir'):
-            from config import VIDEO_DESCRIPTIONS_DIR
-            self.audio_descriptions_dir = os.path.join(os.path.dirname(VIDEO_DESCRIPTIONS_DIR), 'audio_descriptions')
-        
-        # Determine which videos to process
-        if video_ids is None:
-            # Find videos with completed video descriptions but no audio descriptions
-            video_ids = []
-            if not self.metadata_df.empty:
-                for _, row in self.metadata_df.iterrows():
-                    video_id = row['video_id']
-                    
-                    # Check if video descriptions exist
-                    from config import VIDEO_DESCRIPTIONS_DIR
-                    video_desc_file = os.path.join(VIDEO_DESCRIPTIONS_DIR, f"{video_id}_descriptions_aligned.json")
-                    audio_desc_file = os.path.join(self.audio_descriptions_dir, f"{video_id}_audio_descriptions.json")
-                    aligned_audio_desc_file = os.path.join(self.audio_descriptions_dir, f"{video_id}_audio_descriptions_aligned.json")
-                    
-                    # Check if video descriptions exist and no audio descriptions (aligned or original) exist yet
-                    if os.path.exists(video_desc_file) and not os.path.exists(audio_desc_file) and not os.path.exists(aligned_audio_desc_file):
-                        video_ids.append(video_id)
-            else:
-                self.rich_console.print_warning("No metadata available for audio description processing")
-                return (0, 0)
-        
-        if not video_ids:
-            self.rich_console.print_info("No videos require audio description processing")
-            return (0, 0)
-        
-        self.rich_console.print_info(f"Processing audio descriptions for {len(video_ids)} videos")
-        
-        try:
-            # Get audio descriptor (will initialize if needed)
-            audio_desc = self.audio_descriptor
-            if audio_desc is None:
-                self.rich_console.print_error("Audio descriptor initialization failed")
-                return (0, len(video_ids))
-            
-            # Process videos
-            results = audio_desc.process_videos_batch(video_ids)
-            
-            # Count results
-            successful_count = len([r for r in results.values() if r is not None])
-            failed_count = len(video_ids) - successful_count
-            
-            self.rich_console.print_completion_message("Audio Description Generation", {
-                'total': len(video_ids),
-                'successful': successful_count,
-                'duration': 0  # Duration is tracked internally by audio_desc
-            })
-            
-            return (successful_count, failed_count)
-            
-        except Exception as e:
-            self.rich_console.print_error(f"Audio description processing failed: {e}")
-            return (0, len(video_ids))
-        
-        finally:
-            # Cleanup audio descriptor resources
-            if hasattr(self, '_audio_descriptor') and self._audio_descriptor is not None:
-                try:
-                    self._audio_descriptor.cleanup()
-                except Exception as e:
-                    self.rich_console.print_warning(f"Audio descriptor cleanup warning: {e}")
-    
+
     def _cleanup_main_pipeline_models(self):
         """Clean up models used in the main pipeline (Whisper + CLIP)."""
         try:
@@ -1092,9 +909,9 @@ class PipelineOrchestrator:
             
             # Clean up synchronously since we're at the end of the main pipeline
             if components_to_cleanup:
-                self.rich_console.print_info("🧹 Cleaning up main pipeline models (Whisper + CLIP)...")
+                self.rich_console.print_info("Cleaning up main pipeline models (Whisper + CLIP)...")
                 model_cleanup_manager.cleanup_all_models(components_to_cleanup, async_cleanup=False)
-                self.rich_console.print_success("✓ Main pipeline model cleanup completed")
+                self.rich_console.print_success("Main pipeline model cleanup completed")
             else:
                 self.rich_console.print_info("No main pipeline models to clean up")
                 

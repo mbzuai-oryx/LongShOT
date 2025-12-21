@@ -121,51 +121,35 @@ class PipelineConsole:
         self.console.print(panel)
         self.console.print()
     
+    def _print_message(self, message: str, prefix: str, color: str, use_error_console: bool = False):
+        """Internal helper for consistent message printing."""
+        timestamp = time.strftime("%H:%M:%S")
+        formatted = f"[dim]{timestamp}[/] [{self.colors[color]}]{prefix}[/] {message}"
+
+        if self._display_active and self.live:
+            if use_error_console:
+                self.error_console.print(formatted)
+            self._add_info_message(formatted)
+            self.update_live_display()
+        else:
+            console = self.error_console if use_error_console else self.console
+            console.print(formatted)
+
     def print_info(self, message: str, prefix: str = "INFO"):
         """Print an info message with formatting."""
-        timestamp = time.strftime("%H:%M:%S")
-        formatted_message = f"[dim]{timestamp}[/] [{self.colors['info']}]{prefix}[/] {message}"
-        
-        if self._display_active and self.live:
-            self._add_info_message(formatted_message)
-            self.update_live_display()
-        else:
-            self.console.print(formatted_message)
-    
-    def print_success(self, message: str, prefix: str = "✓"):
+        self._print_message(message, prefix, 'info')
+
+    def print_success(self, message: str, prefix: str = "[OK]"):
         """Print a success message with formatting."""
-        timestamp = time.strftime("%H:%M:%S")
-        formatted_message = f"[dim]{timestamp}[/] [{self.colors['success']}]{prefix}[/] {message}"
-        
-        if self._display_active and self.live:
-            self._add_info_message(formatted_message)
-            self.update_live_display()
-        else:
-            self.console.print(formatted_message)
-    
-    def print_error(self, message: str, prefix: str = "✗"):
+        self._print_message(message, prefix, 'success')
+
+    def print_error(self, message: str, prefix: str = "[ERROR]"):
         """Print an error message with formatting."""
-        timestamp = time.strftime("%H:%M:%S")
-        formatted_message = f"[dim]{timestamp}[/] [{self.colors['error']}]{prefix}[/] {message}"
-        
-        # Always print errors directly (they're important)
-        if not (self._display_active and self.live):
-            self.error_console.print(formatted_message)
-        
-        if self._display_active and self.live:
-            self._add_info_message(formatted_message)
-            self.update_live_display()
-    
-    def print_warning(self, message: str, prefix: str = "⚠"):
+        self._print_message(message, prefix, 'error', use_error_console=True)
+
+    def print_warning(self, message: str, prefix: str = "!"):
         """Print a warning message with formatting."""
-        timestamp = time.strftime("%H:%M:%S")
-        formatted_message = f"[dim]{timestamp}[/] [{self.colors['warning']}]{prefix}[/] {message}"
-        
-        if self._display_active and self.live:
-            self._add_info_message(formatted_message)
-            self.update_live_display()
-        else:
-            self.console.print(formatted_message)
+        self._print_message(message, prefix, 'warning')
     
     def print_stage(self, stage: str, video_id: str, action: str):
         """Print a stage-specific message."""
@@ -294,20 +278,11 @@ class PipelineConsole:
                 if self._display_active and any(count > 0 for count in stage_counts.values()):
                     if self._should_update():
                         self.update_live_display()
-    
+
     def update_pipeline_progress(self, advance: int = 1, status: str = None):
-        pass  # No-op, removed main pipeline progress
-    
-    def set_stage_status(self, stage: str, status: str):
-        """Set the status for a specific stage."""
-        with self._lock:
-            if self.stage_progress and stage in self.stage_tasks:
-                self.stage_progress.update(self.stage_tasks[stage], status=status)
-                
-                # Trigger live display update
-                if self._display_active and self._should_update():
-                    self.update_live_display()
-    
+        """No-op for backward compatibility."""
+        pass
+
     def start_live_display(self):
         """Start the live display for real-time progress updates (stage progress only)."""
         if not self.stage_progress:
@@ -323,30 +298,7 @@ class PipelineConsole:
         """Update the live display with current info (stage progress only)."""
         if self.live and self.stage_progress:
             self.live.update(self.stage_progress)
-    
-    def _create_stats_panel(self) -> Panel:
-        """Create a statistics panel."""
-        if not self.stats['start_time']:
-            return Panel("Initializing...", title="Statistics")
-        
-        elapsed = time.time() - self.stats['start_time']
-        elapsed_str = str(timedelta(seconds=int(elapsed)))
-        
-        table = Table(show_header=False, box=None, padding=(0, 1))
-        table.add_column("Metric", style="dim")
-        table.add_column("Value", style=self.colors['metric'])
-        
-        table.add_row("Elapsed", elapsed_str)
-        table.add_row("Total Videos", str(self.stats['total_videos']))
-        table.add_row("Completed", f"[{self.colors['success']}]{self.stats['completed']}[/]")
-        table.add_row("Failed", f"[{self.colors['error']}]{self.stats['failed']}[/]")
-        
-        if self.stats['completed'] > 0 and elapsed > 0:
-            rate = self.stats['completed'] / elapsed * 60  # per minute
-            table.add_row("Rate", f"{rate:.1f}/min")
-        
-        return Panel(table, title="[bold]Pipeline Statistics[/]", border_style="blue")
-    
+
     def _should_update(self) -> bool:
         """Check if enough time has passed since last update."""
         current_time = time.time()
@@ -449,18 +401,18 @@ class PipelineConsole:
         for video_id, status in video_statuses.items():
             # Map status to icons and colors
             status_map = {
-                'pending': ('[dim]⏳[/]', 'dim'),
-                'processing': ('[yellow]⚡[/]', 'yellow'),
-                'completed': ('[green]✓[/]', 'green'),
-                'failed': ('[red]✗[/]', 'red')
+                'pending': ('[dim]...[/]', 'dim'),
+                'processing': ('[yellow]>>>[/]', 'yellow'),
+                'completed': ('[green][OK][/]', 'green'),
+                'failed': ('[red][X][/]', 'red')
             }
-            
-            download_icon, _ = status_map.get(status.get('download', 'pending'), ('❓', 'dim'))
-            preprocess_icon, _ = status_map.get(status.get('preprocess', 'pending'), ('❓', 'dim'))
-            caption_icon, _ = status_map.get(status.get('caption', 'pending'), ('❓', 'dim'))
-            
+
+            download_icon, _ = status_map.get(status.get('download', 'pending'), ('?', 'dim'))
+            preprocess_icon, _ = status_map.get(status.get('preprocess', 'pending'), ('?', 'dim'))
+            caption_icon, _ = status_map.get(status.get('caption', 'pending'), ('?', 'dim'))
+
             overall_status = status.get('overall', 'pending')
-            overall_icon, overall_color = status_map.get(overall_status, ('❓', 'dim'))
+            overall_icon, overall_color = status_map.get(overall_status, ('?', 'dim'))
             
             table.add_row(
                 video_id[:12] + "..." if len(video_id) > 15 else video_id,
@@ -518,13 +470,13 @@ class PipelineConsole:
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             MofNCompleteColumn(),
-            TextColumn("•"),
+            TextColumn("|"),
             StatusColumn(),
             console=self.console,
             refresh_per_second=0.5,
             transient=True  # Make progress bar disappear after completion
         )
-        
+
         task_id = progress.add_task(
             f"[{self.colors['progress']}]Multimodal Understanding[/]",
             total=total_videos,
@@ -536,11 +488,11 @@ class PipelineConsole:
     def create_video_segment_progress(self, video_id: str, total_segments: int) -> tuple[Progress, TaskID]:
         """Create a progress bar for processing segments within a video."""
         progress = Progress(
-            TextColumn(f"[{self.colors['video_id']}]🎬 {video_id}[/]"),
+            TextColumn(f"[{self.colors['video_id']}]{video_id}[/]"),
             BarColumn(bar_width=40),
             MofNCompleteColumn(),
             TextColumn("segments"),
-            TextColumn("•"),
+            TextColumn("|"),
             RateColumn(),
             TimeRemainingColumn(),
             console=self.console,
@@ -580,9 +532,9 @@ class PipelineConsole:
             BarColumn(bar_width=40),
             MofNCompleteColumn(),
             TextColumn("videos"),
-            TextColumn("•"),
+            TextColumn("|"),
             RateColumn(),
-            TextColumn("•"),
+            TextColumn("|"),
             StatusColumn(),
             TimeRemainingColumn(),
             console=self.console,
@@ -604,29 +556,21 @@ class PipelineConsole:
             BarColumn(bar_width=40),
             MofNCompleteColumn(),
             TextColumn("segments"),
-            TextColumn("•"),
+            TextColumn("|"),
             RateColumn(),
-            TextColumn("•"),
+            TextColumn("|"),
             TimeRemainingColumn(),
             console=self.console,
             refresh_per_second=2
         )
-        
+
         task_id = progress.add_task(
             f"Generating {operation.lower()}...",
             total=total_tasks
         )
         
         return progress, task_id
-        
-        task_id = progress.add_task(
-            "Consolidating",
-            total=total_videos,
-            status="Starting..."
-        )
-        
-        return progress, task_id
-    
+
     def print_component_header(self, component: str, action: str):
         """Print a header for a specific component."""
         header = f"[{self.colors['stage']}]{component}[/] - {action}"
@@ -642,9 +586,9 @@ class PipelineConsole:
         
         # Create completion status message
         if failed_count == 0:
-            status = f"[{self.colors['success']}]✓ {component} completed - {total_count} items processed in {timedelta(seconds=int(duration))}[/]"
+            status = f"[{self.colors['success']}][OK] {component} completed - {total_count} items processed in {timedelta(seconds=int(duration))}[/]"
         else:
-            status = f"[{self.colors['warning']}]⚠ {component} completed - {success_count}/{total_count} successful in {timedelta(seconds=int(duration))}[/]"
+            status = f"[{self.colors['warning']}]! {component} completed - {success_count}/{total_count} successful in {timedelta(seconds=int(duration))}[/]"
         
         # Use important info to make sure completion messages are always visible
         self.print_important_info(status, "")

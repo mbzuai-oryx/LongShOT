@@ -40,7 +40,7 @@ def single_turn_infer(audio_file, prompt_text):
         response = model_single.generate_content([sound, full_prompt], generation_config=generation_config_single)
         return response
     except Exception as e:
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 def speech_prompt_infer(audio_prompt_file):
     try:
@@ -49,7 +49,7 @@ def speech_prompt_infer(audio_prompt_file):
         response = model_multi.generate_content([sound, full_prompt], generation_config=generation_config_single)
         return response
     except Exception as e:
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 def think_infer(audio_file, prompt_text):
     try:
@@ -58,7 +58,7 @@ def think_infer(audio_file, prompt_text):
         response = model_think.generate_content([sound, full_prompt], generation_config=generation_config_single)
         return response
     except Exception as e:
-        return f"❌ Error: {str(e)}"
+        return f"Error: {str(e)}"
 
 # ---------------------------------
 # MULTI-TURN INFERENCE FUNCTION
@@ -69,7 +69,7 @@ def multi_turn_chat(user_input, audio_file, history, current_audio):
             current_audio = audio_file  # Update state if a new file is uploaded
 
         if current_audio is None:
-            return history + [("System", "❌ Please upload an audio file before chatting.")], history, current_audio
+            return history + [("System", "Please upload an audio file before chatting.")], history, current_audio
 
         sound = llava.Sound(current_audio)
         prompt = f"<sound>\n{user_input}"
@@ -79,7 +79,7 @@ def multi_turn_chat(user_input, audio_file, history, current_audio):
         history.append((user_input, response))
         return history, history, current_audio
     except Exception as e:
-        history.append((user_input, f"❌ Error: {str(e)}"))
+        history.append((user_input, f"Error: {str(e)}"))
         return history, history, current_audio
 # ---------------------------------
 # INTERFACE
@@ -111,22 +111,22 @@ with gr.Blocks(css=".gradio-container { max-width: 100% !important; margin: 0 au
 
 <div align="center" style="display: flex; justify-content: center; margin-top: 10px; flex-wrap: wrap; gap: 5px;">
   <a href="https://huggingface.co/nvidia/audio-flamingo-3">
-    <img src="https://img.shields.io/badge/🤗-Checkpoints-ED5A22.svg">
+    <img src="https://img.shields.io/badge/HF-Checkpoints-ED5A22.svg">
   </a>
   <a href="https://huggingface.co/nvidia/audio-flamingo-3-chat">
-    <img src="https://img.shields.io/badge/🤗-Checkpoints_(Chat)-ED5A22.svg">
+    <img src="https://img.shields.io/badge/HF-Checkpoints_(Chat)-ED5A22.svg">
   </a>
   <a href="https://huggingface.co/datasets/nvidia/AudioSkills">
-    <img src="https://img.shields.io/badge/🤗-Dataset:_AudioSkills--XL-ED5A22.svg">
+    <img src="https://img.shields.io/badge/HF-Dataset:_AudioSkills--XL-ED5A22.svg">
   </a>
   <a href="https://huggingface.co/datasets/nvidia/LongAudio">
-    <img src="https://img.shields.io/badge/🤗-Dataset:_LongAudio--XL-ED5A22.svg">
+    <img src="https://img.shields.io/badge/HF-Dataset:_LongAudio--XL-ED5A22.svg">
   </a>
   <a href="https://huggingface.co/datasets/nvidia/AF-Chat">
-    <img src="https://img.shields.io/badge/🤗-Dataset:_AF--Chat-ED5A22.svg">
+    <img src="https://img.shields.io/badge/HF-Dataset:_AF--Chat-ED5A22.svg">
   </a>
   <a href="https://huggingface.co/datasets/nvidia/AF-Think">
-    <img src="https://img.shields.io/badge/🤗-Dataset:_AF--Think-ED5A22.svg">
+    <img src="https://img.shields.io/badge/HF-Dataset:_AF--Think-ED5A22.svg">
   </a>
 </div>
 """)
@@ -135,7 +135,7 @@ with gr.Blocks(css=".gradio-container { max-width: 100% !important; margin: 0 au
 
     with gr.Tabs():
         # ---------------- SINGLE-TURN ----------------
-        with gr.Tab("🎯 Single-Turn Inference"):
+        with gr.Tab("Single-Turn Inference"):
             with gr.Row():
                 with gr.Column():
                     audio_input_single = gr.Audio(type="filepath", label="Upload Audio")
@@ -149,14 +149,14 @@ with gr.Blocks(css=".gradio-container { max-width: 100% !important; margin: 0 au
                             ["static/speech/audio3.wav", "Transcribe any speech you hear."],
                         ],
                         inputs=[audio_input_single, prompt_input_single],
-                        label="🧪 Try Examples"
+                        label="Try Examples"
                     )
 
                 with gr.Column():
                     output_single = gr.Textbox(label="Model Response", lines=8)
 
             btn_single.click(fn=single_turn_infer, inputs=[audio_input_single, prompt_input_single], outputs=output_single)
-        with gr.Tab("🤔 AF-Think"):
+        with gr.Tab("AF-Think"):
 
             with gr.Row():
                 with gr.Column():
@@ -170,7 +170,7 @@ with gr.Blocks(css=".gradio-container { max-width: 100% !important; margin: 0 au
                             ["static/think/audio2.wav", "Is the boat in the video moving closer or further away? Choose the correct option from the following options:\n(A) Closer\n(B) Further\nPlease think and reason about the input audio before you respond."],
                         ],
                         inputs=[audio_input_think, prompt_input_think],
-                        label="🧪 Try Examples"
+                        label="Try Examples"
                     )
 
                 with gr.Column():
@@ -178,7 +178,7 @@ with gr.Blocks(css=".gradio-container { max-width: 100% !important; margin: 0 au
 
             btn_think.click(fn=think_infer, inputs=[audio_input_think, prompt_input_think], outputs=output_think)
         # ---------------- MULTI-TURN CHAT ----------------
-        with gr.Tab("💬 Multi-Turn Chat"):
+        with gr.Tab("Multi-Turn Chat"):
             chatbot = gr.Chatbot(label="Audio Chatbot")
             audio_input_multi = gr.Audio(type="filepath", label="Upload or Replace Audio Context")
             user_input_multi = gr.Textbox(label="Your message", placeholder="Ask a question about the audio...")
@@ -197,10 +197,10 @@ with gr.Blocks(css=".gradio-container { max-width: 100% !important; margin: 0 au
                     ["static/chat/audio2.mp3", "Switching gears, this one is super energetic and synthetic. If I wanted to remix the calming folk piece into something closer to this, what would you suggest?"],
                 ],
                 inputs=[audio_input_multi, user_input_multi],
-                label="🧪 Try Examples"
+                label="Try Examples"
             )
 
-        with gr.Tab("🗣️ Speech Prompt"):
+        with gr.Tab("Speech Prompt"):
             gr.Markdown("Use your **voice** to talk to the model.")
 
             with gr.Row():
@@ -214,7 +214,7 @@ with gr.Blocks(css=".gradio-container { max-width: 100% !important; margin: 0 au
                             ["static/voice/voice_2.mp3"],
                         ],
                         inputs=speech_input,
-                        label="🧪 Try Examples"
+                        label="Try Examples"
                     )
                 with gr.Column():
                     response_box = gr.Textbox(label="Model Response", lines=8)
@@ -223,9 +223,9 @@ with gr.Blocks(css=".gradio-container { max-width: 100% !important; margin: 0 au
 
 
         # ---------------- ABOUT ----------------
-        with gr.Tab("📄 About"):
+        with gr.Tab("About"):
             gr.Markdown("""
-### 📚 Overview
+### Overview
 
 **Audio Flamingo 3** is a fully open state-of-the-art (SOTA) large audio-language model that advances reasoning and understanding across speech, sound, and music. AF3 introduces:
 
@@ -243,20 +243,20 @@ To enable these capabilities, we propose several large-scale training datasets c
 
 **Key Features:**
 
-💡 Audio Flamingo 3 has strong audio, music and speech understanding capabilities.
+Audio Flamingo 3 has strong audio, music and speech understanding capabilities.
 
-💡 Audio Flamingo 3 supports on-demand thinking for chain-of-though reasoning.
+Audio Flamingo 3 supports on-demand thinking for chain-of-though reasoning.
 
-💡 Audio Flamingo 3 supports long audio and speech understanding for audios up to 10 minutes.
+Audio Flamingo 3 supports long audio and speech understanding for audios up to 10 minutes.
 
-💡 Audio Flamingo 3 can have multi-turn, multi-audio chat with users under complex context.
+Audio Flamingo 3 can have multi-turn, multi-audio chat with users under complex context.
 
-💡 Audio Flamingo 3 has voice-to-voice conversation abilities.
+Audio Flamingo 3 has voice-to-voice conversation abilities.
 
 
 """)
 
-    gr.Markdown("© 2025 NVIDIA | Built with ❤️ using Gradio + PyTorch")
+    gr.Markdown("(c) 2025 NVIDIA | Built with Gradio + PyTorch")
 
 
 # -----------------------

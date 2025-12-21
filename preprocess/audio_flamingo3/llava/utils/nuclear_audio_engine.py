@@ -37,21 +37,21 @@ try:
     import cupy as cp
     CUPY_AVAILABLE = True
     logger = logging.getLogger(__name__)
-    logger.info("🚀 CuPy GPU acceleration ENABLED")
+    logger.info("CuPy GPU acceleration ENABLED")
 except ImportError:
     CUPY_AVAILABLE = False
     cp = np
     logger = logging.getLogger(__name__)
-    logger.warning("❌ CuPy not available, falling back to CPU numpy")
+    logger.warning("CuPy not available, falling back to CPU numpy")
 
 # Try to import ONNX Runtime for ultra-fast inference
 try:
     import onnxruntime as ort
     ONNX_AVAILABLE = True
-    logger.info("🚀 ONNX Runtime acceleration ENABLED")
+    logger.info("ONNX Runtime acceleration ENABLED")
 except ImportError:
     ONNX_AVAILABLE = False
-    logger.warning("❌ ONNX Runtime not available")
+    logger.warning("ONNX Runtime not available")
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class NuclearAudioConfig:
         self.max_batch_size = 64
         self.prefetch_factor = 8
         
-        logger.info(f"🚀 Nuclear config: GPU={self.use_gpu_audio}, CuPy={self.use_cupy}, Streaming={self.use_streaming}")
+        logger.info(f"Nuclear config: GPU={self.use_gpu_audio}, CuPy={self.use_cupy}, Streaming={self.use_streaming}")
 
 class NuclearAudioLoader:
     """Ultra-fast audio loading using TorchAudio and GPU operations"""
@@ -88,7 +88,7 @@ class NuclearAudioLoader:
         if config.use_gpu_audio:
             self.resampler_cache = {}
         
-        logger.info("🚀 Nuclear audio loader initialized with GPU acceleration")
+        logger.info("Nuclear audio loader initialized with GPU acceleration")
     
     @torch.compile  # Latest PyTorch optimization
     def _gpu_normalize_audio(self, audio_tensor: torch.Tensor) -> torch.Tensor:
@@ -217,9 +217,9 @@ class NuclearFeatureExtractor:
                 QWEN_AUDIO_MODEL,  # Use the Qwen audio model for feature extraction
                 trust_remote_code=True
             )
-            logger.info("🔥 Using HuggingFace feature extractor (fallback)")
+            logger.info("Using HuggingFace feature extractor (fallback)")
         
-        logger.info("🚀 Nuclear feature extractor ready")
+        logger.info("Nuclear feature extractor ready")
     
     def _setup_onnx_runtime(self):
         """Setup ONNX Runtime for ultra-fast inference"""
@@ -230,7 +230,7 @@ class NuclearFeatureExtractor:
             
             # Note: This is a placeholder - in reality we'd need to export the
             # Qwen2-Audio feature extractor to ONNX format first
-            logger.info("🚀 ONNX Runtime providers available: " + str(providers))
+            logger.info("ONNX Runtime providers available: " + str(providers))
             
         except Exception as e:
             logger.warning(f"ONNX setup failed: {str(e)}")
@@ -311,14 +311,14 @@ class NuclearBatchProcessor:
         if config.use_gpu_audio:
             self._setup_gpu_memory_pool()
         
-        logger.info("🚀 Nuclear batch processor initialized")
+        logger.info("Nuclear batch processor initialized")
     
     def _setup_gpu_memory_pool(self):
         """Pre-allocate GPU memory for efficient batching"""
         try:
             # Pre-allocate some common tensor sizes
             torch.cuda.empty_cache()
-            logger.info("🚀 GPU memory pool setup complete")
+            logger.info("GPU memory pool setup complete")
         except Exception as e:
             logger.warning(f"GPU memory pool setup failed: {str(e)}")
     

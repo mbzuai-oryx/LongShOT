@@ -6,7 +6,7 @@
 #   ./vllm_start.sh vlm  # Start VLM model (Qwen2.5-VL-32B-Instruct-AWQ)
 #   ./vllm_start.sh llm  # Start LLM model (Qwen3-30B-A3B-Instruct-2507)
 
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+# export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 # Enable vLLM optimizations
 export VLLM_MARLIN_USE_ATOMIC_ADD=1
@@ -37,8 +37,8 @@ if [ "$MODEL_TYPE" = "vlm" ]; then
 elif [ "$MODEL_TYPE" = "llm" ]; then
     # LLM Model Configuration  
     MODEL_NAME="Qwen/Qwen3-30B-A3B-Instruct-2507"
-    TENSOR_PARALLEL_SIZE=4
-    GPU_MEMORY_UTIL=0.95
+    TENSOR_PARALLEL_SIZE=2
+    GPU_MEMORY_UTIL=0.75
     MAX_MODEL_LEN=65536
     MAX_NUM_SEQS=64
     MAX_BATCHED_TOKENS=65536

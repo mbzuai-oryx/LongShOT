@@ -7,10 +7,7 @@ summaries, categories, and other metadata using LLMs via vLLM.
 
 import os
 import sys
-import argparse
 import logging
-import time
-from datetime import timedelta
 from typing import List, Dict
 
 from caption_pipeline.utils.rich_console import get_console
@@ -36,24 +33,22 @@ logger = logging.getLogger(__name__)
 rich_console = get_console()
 
 
-def run_metadata_generation(video_ids: List[str] = None, max_videos: int = None, 
-                         use_concurrent: bool = True, max_workers: int = 8, 
-                         model_name: str = None, api_base: str = None) -> Dict[str, bool]:
+def run_metadata_generation(video_ids: List[str] = None, max_videos: int = None,
+                         use_concurrent: bool = True, max_workers: int = 8,
+                         api_base: str = None) -> Dict[str, bool]:
     """
     Run metadata generation for videos with descriptions.
-    
+
     Args:
         video_ids: List of specific video IDs to process, or None for all available
         max_videos: Maximum number of videos to process
         use_concurrent: Enable concurrent processing for faster generation
         max_workers: Maximum number of concurrent workers
-        model_name: Name of the model to use (defaults to config)
         api_base: vLLM server API base URL (defaults to config)
-        
+
     Returns:
         Dictionary mapping video IDs to success status (True/False)
     """
-    start_time = time.time()
     
     # Use provided parameters or fall back to config defaults
     server_url = api_base or VLLM_SERVER_URL
@@ -84,9 +79,8 @@ def run_metadata_generation(video_ids: List[str] = None, max_videos: int = None,
         
         # Generate metadata
         results = generator.process_videos(video_ids_with_descriptions, use_concurrent=use_concurrent)
-    
+
     # Calculate and log statistics
-    execution_time = time.time() - start_time
     successful_count = sum(1 for result in results.values() if result)
     total_count = len(results)
     
@@ -99,17 +93,3 @@ def run_metadata_generation(video_ids: List[str] = None, max_videos: int = None,
     return results
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Generate enhanced metadata for videos with descriptions')
-    parser.add_argument('--video-id', type=str, nargs='*', help='Specific video ID(s) to process')
-    parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    parser.add_argument('--max-workers', type=int, default=4, help='Maximum number of concurrent workers')
-    
-    args = parser.parse_args()
-    
-    run_metadata_generation(
-        video_ids=args.video_id,
-        max_videos=args.max_videos,
-        use_concurrent=True,
-        max_workers=args.max_workers
-    )

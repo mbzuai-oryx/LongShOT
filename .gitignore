@@ -8,3 +8,5 @@ datagen/results/*
 eval/results_*
 *.cache
 preprocess/MODELS/*
+note.txt
+.claude

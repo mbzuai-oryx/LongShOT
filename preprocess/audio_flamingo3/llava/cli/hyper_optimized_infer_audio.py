@@ -259,7 +259,7 @@ class ModelServer:
     
     async def initialize(self, model_base: str):
         """Initialize model server"""
-        logger.info("🚀 Initializing Hyper-Optimized Model Server...")
+        logger.info("Initializing Hyper-Optimized Model Server...")
         start_time = time.time()
         
         # Load model once
@@ -273,7 +273,7 @@ class ModelServer:
             await self._setup_cuda_graphs()
         
         total_time = time.time() - start_time
-        logger.info(f"✅ Server initialized in {total_time:.2f}s")
+        logger.info(f"Server initialized in {total_time:.2f}s")
         self.is_running = True
         
     async def _load_model(self, model_base: str):
@@ -303,7 +303,7 @@ class ModelServer:
                     mode="reduce-overhead",
                     fullgraph=False
                 )
-                logger.info("✅ torch.compile applied successfully")
+                logger.info("torch.compile applied successfully")
             except Exception as e:
                 logger.warning(f"torch.compile failed: {e}")
         
@@ -502,7 +502,7 @@ class HyperOptimizedClient:
 def benchmark_performance(server: ModelServer, audio_files: List[str], iterations: int = 10):
     """Benchmark server performance"""
     print("\n" + "="*60)
-    print("🚀 HYPER-OPTIMIZED PERFORMANCE BENCHMARK")
+    print("HYPER-OPTIMIZED PERFORMANCE BENCHMARK")
     print("="*60)
     
     async def run_benchmark():
@@ -612,7 +612,7 @@ async def main():
     
     # Process single file
     if len(audio_files) == 1:
-        print(f"\n🚀 Processing: {audio_files[0]}")
+        print(f"\nProcessing: {audio_files[0]}")
         print("="*60)
         
         result = await client.inference(
@@ -621,14 +621,14 @@ async def main():
         
         if result['success']:
             print(f"Response: {result['response']}")
-            print(f"⚡ Inference time: {result['inference_time']:.3f}s")
-            print(f"🔥 Total time: {result['total_time']:.3f}s")
+            print(f"Inference time: {result['inference_time']:.3f}s")
+            print(f"Total time: {result['total_time']:.3f}s")
         else:
             print(f"Error: {result['error']}")
     
     # Process multiple files
     else:
-        print(f"\n🚀 Processing {len(audio_files)} files...")
+        print(f"\nProcessing {len(audio_files)} files...")
         
         requests = []
         for audio_file in audio_files:
@@ -648,18 +648,18 @@ async def main():
             if result['success']:
                 successful += 1
                 total_time += result['inference_time']
-                print(f"✅ {result['id']}: {result['inference_time']:.3f}s")
+                print(f"[OK] {result['id']}: {result['inference_time']:.3f}s")
             else:
-                print(f"❌ {result['id']}: {result['error']}")
+                print(f"[FAIL] {result['id']}: {result['error']}")
         
         if successful > 0:
             avg_time = total_time / successful 
-            print(f"\n📊 Average inference time: {avg_time:.3f}s")
-            print(f"🚀 Speedup vs original: {2.0/avg_time:.1f}x")
+            print(f"\nAverage inference time: {avg_time:.3f}s")
+            print(f"Speedup vs original: {2.0/avg_time:.1f}x")
     
     # Print server stats
     stats = server.get_stats()
-    print(f"\n📈 Server Stats:")
+    print(f"\nServer Stats:")
     print(f"Total requests: {stats['total_requests']}")
     print(f"Average inference time: {stats['avg_inference_time']:.3f}s")
     print(f"GPU memory used: {stats['gpu_memory_used']:.1f}GB")

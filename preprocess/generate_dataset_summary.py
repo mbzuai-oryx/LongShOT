@@ -26,7 +26,7 @@ def main():
     
     # Generate and save summary
     summary_file = analyzer.generate_and_save_summary()
-    rich_console.print_success(f"📄 Detailed summary available in: {summary_file}")
+    rich_console.print_success(f"Detailed summary available in: {summary_file}")
 
 
 if __name__ == "__main__":

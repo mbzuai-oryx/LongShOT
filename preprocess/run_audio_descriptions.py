@@ -8,15 +8,10 @@ audio descriptions for non-speech content using Audio Flamingo 3.
 
 import os
 import sys
-import argparse
 import logging
 import time
 from typing import List, Optional
 
-# Set multiprocessing start method before other imports
-import multiprocessing as mp
-if __name__ == "__main__":
-    mp.set_start_method('spawn', force=True)
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -83,31 +78,31 @@ def run_audio_descriptions(video_ids: Optional[List[str]] = None,
                           num_gpus: Optional[int] = None) -> bool:
     """
     Run audio descriptions for specified videos or all videos needing processing.
-    
+
     Args:
         video_ids: Optional list of specific video IDs to process
         max_videos: Maximum number of videos to process
         model_path: Path to Audio Flamingo 3 model
         batch_size: Batch size for processing
         num_gpus: Number of GPUs to use
-        
+
     Returns:
         True if processing was successful, False otherwise
     """
     start_time = time.time()
-    
+
     # Determine videos to process
     if video_ids is None:
         video_ids = find_videos_needing_audio_descriptions(max_videos)
-    
+
     if not video_ids:
         rich_console.print_info("No videos require audio description processing")
         return True
-    
+
     # Initialize audio descriptor
-    rich_console.print_component_header("Audio Description Setup", 
+    rich_console.print_component_header("Audio Description Setup",
                                       f"Initializing Audio Flamingo 3 for {len(video_ids)} videos")
-    
+
     try:
         audio_descriptor = AudioDescriptor(
             model_path=model_path,
@@ -152,106 +147,3 @@ def run_audio_descriptions(video_ids: Optional[List[str]] = None,
         except Exception as e:
             rich_console.print_warning(f"Cleanup warning: {e}")
 
-def main():
-    """Main entry point for the audio descriptions script."""
-    parser = argparse.ArgumentParser(
-        description='Generate audio descriptions for videos using Audio Flamingo 3',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Process all videos needing audio descriptions
-  python run_audio_descriptions.py
-  
-  # Process specific videos
-  python run_audio_descriptions.py --video-ids video1 video2 video3
-  
-  # Process up to 10 videos with custom model path
-  python run_audio_descriptions.py --max-videos 10 --model-path /path/to/model
-  
-  # Use multiple GPUs with larger batch size
-  python run_audio_descriptions.py --num-gpus 2 --batch-size 16
-        """
-    )
-    
-    # Video selection arguments
-    parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
-    parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    
-    # Model and processing arguments
-    parser.add_argument('--model-path', type=str, 
-                       default=AUDIO_FLAMINGO_MODEL_PATH,
-                       help='Path to Audio Flamingo 3 model')
-    parser.add_argument('--batch-size', type=int, default=8,
-                       help='Batch size for processing (default: 8)')
-    parser.add_argument('--num-gpus', type=int, help='Number of GPUs to use (default: auto-detect)')
-    
-    
-    # Processing options
-    parser.add_argument('--text-prompt', type=str,
-                       default="Please describe the audio in detail, focusing on music, sounds, ambience, and any non-speech audio content.",
-                       help='Text prompt for audio description')
-    
-    # Output options
-    parser.add_argument('--quiet', action='store_true', help='Reduce output verbosity')
-    parser.add_argument('--list-only', action='store_true', 
-                       help='Only list videos that need processing, do not process them')
-    
-    args = parser.parse_args()
-    
-    # Configure logging based on verbosity
-    if args.quiet:
-        logging.getLogger().setLevel(logging.WARNING)
-    
-    # Handle list-only mode
-    if args.list_only:
-        video_ids = find_videos_needing_audio_descriptions(args.max_videos)
-        if video_ids:
-            print("Videos needing audio descriptions:")
-            for video_id in video_ids:
-                print(f"  - {video_id}")
-        else:
-            print("No videos need audio descriptions")
-        return
-    
-    # Print startup information
-    rich_console.print_header(
-        "Audio Description Generation",
-        "Processing videos with Audio Flamingo 3 for non-speech audio content"
-    )
-    
-    # Show configuration
-    rich_console.print_info("Configuration:")
-    rich_console.print_info(f"  • Model path: {args.model_path}")
-    rich_console.print_info(f"  • Batch size: {args.batch_size}")
-    rich_console.print_info(f"  • GPUs: {args.num_gpus or 'auto-detect'}")
-    if args.max_videos:
-        rich_console.print_info(f"  • Max videos: {args.max_videos}")
-    if args.video_ids:
-        rich_console.print_info(f"  • Specific videos: {len(args.video_ids)} videos")
-    rich_console.print_info("")
-    
-    # Run processing
-    success = run_audio_descriptions(
-        video_ids=args.video_ids,
-        max_videos=args.max_videos,
-        model_path=args.model_path,
-        batch_size=args.batch_size,
-        num_gpus=args.num_gpus
-    )
-    
-    if success:
-        rich_console.print_success("Audio description processing completed successfully")
-        sys.exit(0)
-    else:
-        rich_console.print_error("Audio description processing failed")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        rich_console.print_warning("Processing interrupted by user")
-        sys.exit(1)
-    except Exception as e:
-        rich_console.print_error(f"Unexpected error: {e}")
-        sys.exit(1)

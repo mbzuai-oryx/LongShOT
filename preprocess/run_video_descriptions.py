@@ -1,16 +1,14 @@
 #!/usr/bin/env python
 """
-Standalone script to run video description generation for the Arabic video dataset.
+Standalone script to run video description generation for the LongShOT video dataset.
 This script processes videos that already have completed audio captions and generates
 visual descriptions using Qwen 2.5-VL via vLLM.
 """
 
 import os
 import sys
-import argparse
 import logging
 import time
-from datetime import timedelta
 from typing import List, Dict
 
 from caption_pipeline.utils.rich_console import get_console
@@ -76,12 +74,12 @@ def run_video_descriptions(video_ids: List[str] = None, max_videos: int = None, 
     
     if video_ids:
         # Process specific video IDs
-        results = descriptor.process_video_batch(video_ids, auto_metadata=auto_metadata)
+        results = descriptor.process_video_batch(video_ids)
     else:
         # Process all available videos
         # Use the batch generation method
         try:
-            description_files = descriptor.batch_generate_descriptions(max_videos=max_videos, auto_metadata=auto_metadata)
+            description_files = descriptor.batch_generate_descriptions(max_videos=max_videos)
             results = {os.path.basename(f).replace('_descriptions.json', ''): f 
                       for f in description_files}
         except Exception as e:
@@ -150,89 +148,3 @@ def trigger_metadata_generation(video_ids: List[str], max_workers: int = 8) -> b
         return False
 
 
-def main():
-    """Parse arguments and run video description generation."""
-    parser = argparse.ArgumentParser(description='Generate video descriptions for Arabic videos')
-    
-    # Video selection options
-    parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
-    parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    
-    # Model configuration options
-    parser.add_argument('--model', type=str, default=VIDEO_DESCRIPTION_MODEL, 
-                       help=f'Vision model to use (default: {VIDEO_DESCRIPTION_MODEL})')
-    parser.add_argument('--api-base', type=str, default=VLLM_SERVER_URL,
-                       help=f'vLLM server API base URL (default: {VLLM_SERVER_URL})')
-    
-    # Concurrent processing options
-    parser.add_argument('--max-workers', type=int, default=4,
-                       help='Maximum number of concurrent workers (default: 4)')
-    
-    # Metadata generation options
-    parser.add_argument('--no-auto-metadata', action='store_true',
-                       help='Disable automatic metadata generation after video descriptions complete')
-    
-    # Logging options
-    parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
-    
-    args = parser.parse_args()
-    
-    # Set logging level
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    
-    # Override configuration if custom parameters provided
-    model_name = VIDEO_DESCRIPTION_MODEL
-    api_base = VLLM_SERVER_URL
-    
-    if args.model != VIDEO_DESCRIPTION_MODEL:
-        model_name = args.model
-        rich_console.print_info(f"Using custom model: {model_name}")
-    
-    if args.api_base != VLLM_SERVER_URL:
-        api_base = args.api_base
-        rich_console.print_info(f"Using custom API base: {api_base}")
-    
-    # Run video description generation with potentially custom settings
-    from caption_pipeline.pipeline.video_descriptor import VideoDescriptor
-    
-    # Initialize with custom parameters and enhanced parallelism
-    descriptor = VideoDescriptor(
-        model_name=model_name,
-        api_base=api_base,
-        max_workers=args.max_workers
-    )
-    
-    # Process videos with the custom-configured descriptor
-    try:
-        results = run_video_descriptions(
-            video_ids=args.video_ids,
-            max_videos=args.max_videos,
-            descriptor=descriptor,
-            max_workers=args.max_workers,
-            auto_metadata=not args.no_auto_metadata,
-        )
-        
-        if results:
-            rich_console.print_info("Video description generation completed successfully")
-            
-            # Print results summary
-            successful = [vid for vid, result in results.items() if result is not None]
-            failed = [vid for vid, result in results.items() if result is None]
-            
-            if successful:
-                rich_console.print_info(f"Successfully processed videos: {', '.join(successful)}")
-            
-            if failed:
-                rich_console.print_warning(f"Failed to process videos: {', '.join(failed)}")
-        else:
-            rich_console.print_error("No videos were processed")
-            sys.exit(1)
-            
-    except Exception as e:
-        rich_console.print_error(f"Video description generation failed: {e}")
-        sys.exit(1)
-
-
-if __name__ == '__main__':
-    main()

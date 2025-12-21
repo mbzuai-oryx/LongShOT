@@ -55,16 +55,16 @@ def download_video(video_id, output_dir):
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode == 0:
-            print(f"✅ Successfully downloaded: {video_id}")
+            print(f"Successfully downloaded: {video_id}")
             return True
         else:
-            print(f"❌ Failed to download {video_id}: {result.stderr}")
+            print(f"Failed to download {video_id}: {result.stderr}")
             return False
     except subprocess.TimeoutExpired:
-        print(f"⏰ Timeout downloading {video_id}")
+        print(f"Timeout downloading {video_id}")
         return False
     except Exception as e:
-        print(f"❌ Error downloading {video_id}: {e}")
+        print(f"Error downloading {video_id}: {e}")
         return False
 
 def main():
@@ -76,28 +76,28 @@ def main():
     os.makedirs(videos_output_dir, exist_ok=True)
     
     # Get video IDs to download
-    print("📋 Reading video IDs from file...")
+    print("Reading video IDs from file...")
     all_video_ids = get_video_ids_from_file(video_ids_file)
     print(f"Found {len(all_video_ids)} video IDs in {video_ids_file}")
     
     # Get already downloaded videos
-    print("📁 Checking existing downloads...")
+    print("Checking existing downloads...")
     existing_ids = get_existing_videos(videos_output_dir)
     print(f"Found {len(existing_ids)} already downloaded videos")
     
     # Find missing videos
     missing_ids = [vid_id for vid_id in all_video_ids if vid_id not in existing_ids]
-    print(f"🔍 Need to download {len(missing_ids)} missing videos")
+    print(f"Need to download {len(missing_ids)} missing videos")
     
     if not missing_ids:
-        print("✅ All videos already downloaded!")
+        print("All videos already downloaded!")
         return
     
     # Download missing videos
     successful = 0
     failed = 0
     
-    print(f"\n📥 Starting downloads...")
+    print(f"\nStarting downloads...")
     for i, video_id in enumerate(missing_ids, 1):
         print(f"\n[{i}/{len(missing_ids)}] Downloading {video_id}...")
         if download_video(video_id, videos_output_dir):
@@ -105,10 +105,10 @@ def main():
         else:
             failed += 1
     
-    print(f"\n📊 Download Summary:")
-    print(f"✅ Successful: {successful}")
-    print(f"❌ Failed: {failed}")
-    print(f"📁 Total videos in directory: {len(existing_ids) + successful}")
+    print(f"\nDownload Summary:")
+    print(f"Successful: {successful}")
+    print(f"Failed: {failed}")
+    print(f"Total videos in directory: {len(existing_ids) + successful}")
 
 if __name__ == "__main__":
     main()

@@ -10,7 +10,7 @@ import os
 import json
 import time
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional, Tuple
 import sys
 
@@ -21,12 +21,19 @@ from config import VIDEO_DESCRIPTION_MODEL, VLLM_SERVER_URL
 # Import rich console utilities
 from caption_pipeline.utils.rich_console import get_console
 
-# Import required components
-from openai import OpenAI
+# Import common VLM utilities
+from caption_pipeline.utils.vlm_common import (
+    create_vllm_client, has_valid_description, collect_concurrent_results
+)
 
 # Set up logging
 logger = logging.getLogger(__name__)
 rich_console = get_console()
+
+# Constants for alignment
+ALIGNMENT_MAX_TOKENS = 512  # Tokens for alignment response
+ALIGNMENT_TEMPERATURE = 0.3  # Lower temperature for consistent alignment
+MIN_DESCRIPTION_LENGTH = 50  # Minimum valid description length
 
 # Enhanced visual alignment prompt with structured temporal guidance
 ALIGNMENT_PROMPT = """
@@ -49,10 +56,10 @@ VISUAL DESCRIPTION FRAMEWORK:
 - Capture visual continuity while emphasizing new developments
 
 EFFECTIVE TRANSITIONS:
-✓ "Movement continues as..." / "Action progresses to..."
-✓ "Visual focus shifts from... to..."
-✓ "Scene develops with..." / "Frame reveals..."
-✓ Smooth narrative flow connecting visual elements
+- "Movement continues as..." / "Action progresses to..."
+- "Visual focus shifts from... to..."
+- "Scene develops with..." / "Frame reveals..."
+- Smooth narrative flow connecting visual elements
 
 Previous Visual Context: {previous_description}
 Current Visual Content: {current_description}
@@ -78,21 +85,7 @@ class VideoDescriptionAligner:
         
         rich_console.print_info(f"Video Description Aligner initialized with model: {model_name}")
         rich_console.print_info(f"Using API base: {self.api_base}")
-    
-    def _test_connection(self):
-        """Test connection to vLLM server."""
-        try:
-            client = OpenAI(api_key="token-abc123", base_url=self.api_base)
-            client.chat.completions.create(
-                model=self.model_name,
-                messages=[{"role": "user", "content": "Test"}],
-                max_tokens=5
-            )
-            rich_console.print_info(f"vLLM server connection successful at {self.api_base}")
-        except Exception as e:
-            rich_console.print_error(f"Failed to connect to vLLM server: {e}")
-            raise
-    
+
     def align_video_descriptions(self, video_descriptions_file: str) -> Optional[str]:
         """Align video descriptions in a file to improve temporal continuity.
         
@@ -133,18 +126,14 @@ class VideoDescriptionAligner:
         for i in range(1, len(segments)):
             current_segment = segments[i]
             previous_segment = segments[i - 1]
-            
-            # Only align segments that have visual descriptions
-            if (current_segment.get('visual_description') and 
-                previous_segment.get('visual_description') and
-                current_segment['visual_description'] != "No frames could be extracted from this video segment" and
-                previous_segment['visual_description'] != "No frames could be extracted from this video segment"):
-                
+
+            # Only align segments that have valid visual descriptions
+            if (has_valid_description(current_segment, 'visual_description') and
+                has_valid_description(previous_segment, 'visual_description')):
                 alignment_tasks.append({
                     'segment_index': i,
                     'current_description': current_segment['visual_description'],
-                    'previous_description': previous_segment['visual_description'],
-                    'segment_data': current_segment
+                    'previous_description': previous_segment['visual_description']
                 })
         
         if not alignment_tasks:
@@ -200,92 +189,71 @@ class VideoDescriptionAligner:
     
     def _process_alignments_concurrent(self, alignment_tasks: List[Dict]) -> List[str]:
         """Process alignment tasks concurrently."""
-        aligned_descriptions = []
-        
         if not alignment_tasks:
-            return aligned_descriptions
-        
+            return []
+
         rich_console.print_info(f"Processing {len(alignment_tasks)} alignment tasks with {self.max_workers} workers")
-        
+
         # Create progress tracking
         try:
             progress, task_id = rich_console.create_video_description_progress("Alignment", len(alignment_tasks))
-        except:
+        except Exception:
             progress, task_id = None, None
-        
+
         # Process alignments concurrently
         max_concurrent = min(len(alignment_tasks), self.max_workers)
         with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
-            # Submit all alignment requests
-            future_to_index = {}
-            for i, task in enumerate(alignment_tasks):
-                future = executor.submit(self._align_single_description, 
-                                       task['current_description'], 
-                                       task['previous_description'])
-                future_to_index[future] = i
-            
-            # Initialize results with None values
-            aligned_descriptions = [None] * len(alignment_tasks)
-            
-            # Collect results with progress tracking
-            completed_count = 0
+            future_to_index = {
+                executor.submit(
+                    self._align_single_description,
+                    task['current_description'],
+                    task['previous_description']
+                ): i
+                for i, task in enumerate(alignment_tasks)
+            }
+
+            # Use shared utility for result collection with progress
             if progress:
                 with progress:
-                    for future in as_completed(future_to_index):
-                        index = future_to_index[future]
-                        try:
-                            aligned_description = future.result()
-                            aligned_descriptions[index] = aligned_description
-                            completed_count += 1
-                            progress.update(task_id, advance=1)
-                        except Exception as e:
-                            rich_console.print_error(f"Error aligning segment {index}: {e}")
-                            aligned_descriptions[index] = "ALIGNMENT_ERROR"
+                    return collect_concurrent_results(
+                        future_to_index, progress, task_id,
+                        error_value="ALIGNMENT_ERROR", console=rich_console
+                    )
             else:
-                for future in as_completed(future_to_index):
-                    index = future_to_index[future]
-                    try:
-                        aligned_description = future.result()
-                        aligned_descriptions[index] = aligned_description
-                        completed_count += 1
-                        rich_console.print_info(f"Completed alignment {completed_count}/{len(alignment_tasks)}")
-                    except Exception as e:
-                        rich_console.print_error(f"Error aligning segment {index}: {e}")
-                        aligned_descriptions[index] = "ALIGNMENT_ERROR"
-        
-        return aligned_descriptions
+                return collect_concurrent_results(
+                    future_to_index, error_value="ALIGNMENT_ERROR", console=rich_console
+                )
     
     def _align_single_description(self, current_description: str, previous_description: str) -> str:
         """Align a single segment description with its previous segment."""
         try:
-            client = OpenAI(api_key="token-abc123", base_url=self.api_base)
-            
-            # Create prompt for alignment
-            prompt = f"{ALIGNMENT_PROMPT}\n\n"
-            prompt += f"**Previous Segment Description:**\n{previous_description}\n\n"
-            prompt += f"**Current Segment Description (to be aligned):**\n{current_description}\n\n"
-            prompt += "**Refined Aligned Description:**"
-            
-            # Make request to vLLM server
+            client = create_vllm_client(self.api_base)
+
+            # Create prompt using template
+            prompt = ALIGNMENT_PROMPT.format(
+                previous_description=previous_description,
+                current_description=current_description
+            )
+
             response = client.chat.completions.create(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=512,  # Slightly less than original to focus on refinement
-                temperature=0.3   # Lower temperature for more consistent alignment
+                max_tokens=ALIGNMENT_MAX_TOKENS,
+                temperature=ALIGNMENT_TEMPERATURE
             )
-            
+
             aligned_description = response.choices[0].message.content.strip()
-            
-            # Basic validation - ensure we got a reasonable response
-            if len(aligned_description) < 50:  # Too short, likely an error
+
+            # Validate response length
+            if len(aligned_description) < MIN_DESCRIPTION_LENGTH:
                 rich_console.print_warning("Alignment produced very short result, using original")
                 return current_description
-            
+
             return aligned_description
-            
+
         except Exception as e:
             rich_console.print_error(f"Error in alignment request: {e}")
-            return current_description  # Fall back to original description
+            return current_description
     
     def batch_align_descriptions(self, video_ids: List[str] = None, max_videos: int = None, 
                                 descriptions_dir: str = None) -> List[str]:
@@ -300,8 +268,6 @@ class VideoDescriptionAligner:
             List of aligned description file paths
         """
         if descriptions_dir is None:
-            # Import here to avoid circular imports
-            sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
             from config import VIDEO_DESCRIPTIONS_DIR
             descriptions_dir = VIDEO_DESCRIPTIONS_DIR
         
@@ -347,13 +313,13 @@ class VideoDescriptionAligner:
                 aligned_file = self.align_video_descriptions(desc_file)
                 if aligned_file:
                     aligned_files.append(aligned_file)
-                    rich_console.print_success(f"✓ Successfully aligned descriptions for {video_id} ({i}/{len(files_to_process)})")
+                    rich_console.print_success(f"Successfully aligned descriptions for {video_id} ({i}/{len(files_to_process)})")
                 else:
                     failed_files.append(video_id)
-                    rich_console.print_error(f"✗ Failed to align descriptions for {video_id} ({i}/{len(files_to_process)})")
+                    rich_console.print_error(f"Failed to align descriptions for {video_id} ({i}/{len(files_to_process)})")
             except Exception as e:
                 failed_files.append(video_id)
-                rich_console.print_error(f"✗ Error aligning descriptions for {video_id}: {e}")
+                rich_console.print_error(f"Error aligning descriptions for {video_id}: {e}")
         
         # Print summary
         success_count = len(aligned_files)

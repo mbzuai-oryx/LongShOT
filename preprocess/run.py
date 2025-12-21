@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Main script to run the complete pipeline for the Arabic video dataset.
+Main script to run the complete pipeline for the LongShOT video dataset.
 """
 
 import os
@@ -12,14 +12,10 @@ from datetime import timedelta
 
 from config import AUDIO_FLAMINGO_MODEL_PATH
 
-# Set multiprocessing start method to 'spawn' before importing other modules
-# This is critical for CUDA support in multiprocessing
 if __name__ == "__main__":
     mp.set_start_method('spawn', force=True)
 
 from caption_pipeline.pipeline.orchestrator import PipelineOrchestrator
-from caption_pipeline.interface.app import run_app, create_app
-from caption_pipeline.interface.routes.auth import create_admin_user
 
 # Import rich console utilities
 from caption_pipeline.utils.rich_console import get_console
@@ -40,7 +36,6 @@ logging.getLogger('httpx').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 logging.getLogger('requests').setLevel(logging.WARNING)
 logging.getLogger('faster_whisper').setLevel(logging.WARNING)
-logging.getLogger('caption_pipeline.models.movie_caption_enhancer').setLevel(logging.WARNING)
 logging.getLogger('caption_pipeline.pipeline.caption_generator').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
@@ -51,93 +46,62 @@ execution_times = {}
 rich_console = get_console()
 
 
+def get_processing_args(args, defaults=None):
+    """Extract common processing arguments from args with defaults."""
+    defaults = defaults or {}
+    return {
+        'video_ids': getattr(args, 'video_ids', None),
+        'max_videos': getattr(args, 'max_videos', None),
+        'max_workers': getattr(args, 'max_workers', defaults.get('max_workers', 8)),
+    }
 
+
+def build_scope_message(video_ids, max_videos, context: str = "") -> str:
+    """Build scope description message for processing stages."""
+    if video_ids:
+        return f"specific video IDs ({len(video_ids)} videos)"
+    elif max_videos:
+        return f"up to {max_videos} videos{' with ' + context if context else ''}"
+    return f"all videos{' with ' + context if context else ''}"
 
 def run_video_descriptions(args):
     """Run video description generation with parallel or sequential processing."""
     start_time = time.time()
-    
+
     from run_video_descriptions import run_video_descriptions as run_desc
-    
-    video_ids = args.video_ids if hasattr(args, 'video_ids') else None
-    max_videos = args.max_videos if hasattr(args, 'max_videos') else None
-    max_workers = args.max_workers if hasattr(args, 'max_workers') else 8
-    
-    # Consolidated startup message
-    scope_msg = ""
-    if video_ids:
-        scope_msg = f"specific video IDs ({len(video_ids)} videos)"
-    elif max_videos:
-        scope_msg = f"up to {max_videos} videos with completed captions"
-    else:
-        scope_msg = "all videos with completed captions"
-    
-    processing_mode = f"concurrent (max_workers={max_workers})"
-    rich_console.print_info(f"Starting video description generation for {scope_msg} ({processing_mode})...")
+
+    proc = get_processing_args(args)
+    scope_msg = build_scope_message(proc['video_ids'], proc['max_videos'], "completed captions")
+    rich_console.print_info(f"Starting video description generation for {scope_msg} (concurrent, max_workers={proc['max_workers']})...")
     
     # Disable auto_metadata to prevent duplicate metadata generation since we call it explicitly later
-    run_desc(video_ids=video_ids, max_videos=max_videos, max_workers=max_workers, auto_metadata=False)
+    run_desc(video_ids=proc['video_ids'], max_videos=proc['max_videos'], max_workers=proc['max_workers'], auto_metadata=False)
     
     execution_time = time.time() - start_time
     execution_times['video_descriptions'] = execution_time
 
 
 def run_audio_descriptions(args):
-    """Run audio description generation using Audio Flamingo 3."""  
+    """Run audio description generation using Audio Flamingo 3."""
     start_time = time.time()
-    
+
     from run_audio_descriptions import run_audio_descriptions as run_audio
-    
-    video_ids = args.video_ids if hasattr(args, 'video_ids') else None
-    max_videos = args.max_videos if hasattr(args, 'max_videos') else None
-    
-    # Consolidated startup message
-    scope_msg = ""
-    if video_ids:
-        scope_msg = f"specific video IDs ({len(video_ids)} videos)"
-    elif max_videos:
-        scope_msg = f"up to {max_videos} videos with video descriptions"
-    else:
-        scope_msg = "all videos with video descriptions"
-    
+
+    proc = get_processing_args(args)
+    scope_msg = build_scope_message(proc['video_ids'], proc['max_videos'], "video descriptions")
     rich_console.print_info(f"Starting audio description generation for {scope_msg}...")
     
     # Get model path and processing args
     model_path = getattr(args, 'audio_model_path', AUDIO_FLAMINGO_MODEL_PATH)
     batch_size = getattr(args, 'audio_batch_size', 8)
     num_gpus = getattr(args, 'audio_gpus', None)
-    
-    run_audio(video_ids=video_ids, max_videos=max_videos, 
+
+    run_audio(video_ids=proc['video_ids'], max_videos=proc['max_videos'],
               model_path=model_path, batch_size=batch_size, num_gpus=num_gpus)
     
     execution_time = time.time() - start_time
     execution_times['audio_descriptions'] = execution_time
 
-
-def run_parallel_video_and_audio_descriptions(args):
-    """
-    Run video descriptions and audio descriptions in sequence (parallel processing disabled due to GPU OOM issues).
-    
-    This function provides sequential processing to avoid GPU memory conflicts.
-    """
-    start_time = time.time()
-    
-    rich_console.print_warning("⚠️ Parallel processing temporarily disabled due to GPU memory issues")
-    rich_console.print_info("� Running video and audio descriptions sequentially")
-    
-    # Run video descriptions first
-    rich_console.print_info("1️⃣ Starting video description generation...")
-    run_video_descriptions(args)
-    
-    # Run audio descriptions after video descriptions complete
-    if getattr(args, 'audio_descriptions', False):
-        rich_console.print_info("2️⃣ Starting audio description generation...")
-        run_audio_descriptions(args)
-    
-    execution_time = time.time() - start_time
-    execution_times['sequential_video_audio_descriptions'] = execution_time
-    
-    rich_console.print_success(f"✓ Sequential processing completed in {execution_time/60:.1f} minutes")
 
 def run_video_description_alignment(args, model_name=None):
     """Run video description alignment for temporal continuity."""
@@ -260,17 +224,16 @@ def run_multimodal_understanding_alignment(args, model_name=None):
 def run_audio_description_alignment(args, model_name=None):
     """Run audio description alignment for temporal and spatial continuity."""
     start_time = time.time()
-    
+
     from run_audio_description_alignment import run_audio_description_alignment as run_alignment
     from config import LLM_MODEL, LLM_SERVER_URL
-    
+
     video_ids = args.video_ids if hasattr(args, 'video_ids') else None
     max_videos = args.max_videos if hasattr(args, 'max_videos') else None
     max_workers = getattr(args, 'max_workers', 8)
-    context_segments = getattr(args, 'context_segments', 3)
     # Use provided model_name or fall back to LLM_MODEL
     model_to_use = model_name or getattr(args, 'model', LLM_MODEL)
-    
+
     # Consolidated startup message
     scope_msg = ""
     if video_ids:
@@ -279,16 +242,16 @@ def run_audio_description_alignment(args, model_name=None):
         scope_msg = f"up to {max_videos} videos"
     else:
         scope_msg = "all available videos"
-    
-    rich_console.print_info(f"Starting audio description alignment for {scope_msg} (max_workers={max_workers}, context_segments={context_segments}, model={model_to_use})...")
-    
+
+    rich_console.print_info(f"Starting audio description alignment for {scope_msg} (max_workers={max_workers}, model={model_to_use})...")
+
     # Get appropriate server URL
-    api_base = LLM_SERVER_URL 
-    
-    # Run alignment
-    success = run_alignment(video_ids=video_ids, max_videos=max_videos, 
-                           model_name=model_to_use, api_base=api_base, 
-                           max_workers=max_workers, context_segments=context_segments)
+    api_base = LLM_SERVER_URL
+
+    # Run alignment (context_segments hardcoded to 3)
+    success = run_alignment(video_ids=video_ids, max_videos=max_videos,
+                           model_name=model_to_use, api_base=api_base,
+                           max_workers=max_workers)
     
     execution_time = time.time() - start_time
     execution_times['audio_description_alignment'] = execution_time
@@ -343,13 +306,13 @@ def run_key_events_generation(args, model_name=None):
 def run_metadata_generation(args, model_name=None):
     """Run enhanced metadata generation with parallel processing by default."""
     start_time = time.time()
-    
+
     from run_metadata_generation import run_metadata_generation as run_meta
     from config import VIDEO_DESCRIPTION_MODEL
-    
+
     video_ids = args.video_ids if hasattr(args, 'video_ids') else None
     max_videos = args.max_videos if hasattr(args, 'max_videos') else None
-    max_workers = args.workers if hasattr(args, 'workers') else 8
+    max_workers = getattr(args, 'max_workers', 8)
     # Use provided model_name or fall back to VIDEO_DESCRIPTION_MODEL
     model_to_use = model_name or getattr(args, 'model', VIDEO_DESCRIPTION_MODEL)
     
@@ -367,11 +330,11 @@ def run_metadata_generation(args, model_name=None):
     # Get appropriate server URL
     from config import LLM_SERVER_URL, VLLM_SERVER_URL, LLM_MODEL
     api_base = LLM_SERVER_URL if model_to_use == LLM_MODEL else VLLM_SERVER_URL
-    
-    # Pass model name and API base to the function
-    run_meta(video_ids=video_ids, max_videos=max_videos, 
-             use_concurrent=True, max_workers=max_workers, 
-             model_name=model_to_use, api_base=api_base)
+
+    # Pass API base to the function
+    run_meta(video_ids=video_ids, max_videos=max_videos,
+             use_concurrent=True, max_workers=max_workers,
+             api_base=api_base)
     
     execution_time = time.time() - start_time
     execution_times['metadata_generation'] = execution_time
@@ -380,26 +343,16 @@ def run_metadata_generation(args, model_name=None):
 def run_final_consolidation(args):
     """Run final consolidation to create training-ready JSONL files."""
     start_time = time.time()
-    
+
     from caption_pipeline.pipeline.final_consolidator import FinalConsolidator
-    
-    video_ids = args.video_ids if hasattr(args, 'video_ids') else None
-    max_videos = args.max_videos if hasattr(args, 'max_videos') else None
-    
-    # Consolidated startup message
-    scope_msg = ""
-    if video_ids:
-        scope_msg = f"specific video IDs ({len(video_ids)} videos)"
-    elif max_videos:
-        scope_msg = f"up to {max_videos} processed videos"
-    else:
-        scope_msg = "all processed videos"
-    
+
+    proc = get_processing_args(args)
+    scope_msg = build_scope_message(proc['video_ids'], proc['max_videos'], "processed")
     rich_console.print_info(f"Starting final consolidation for {scope_msg}...")
-    
+
     # Initialize consolidator and process videos
     consolidator = FinalConsolidator()
-    consolidator.consolidate_all_videos(video_ids=video_ids, max_videos=max_videos)
+    consolidator.consolidate_all_videos(video_ids=proc['video_ids'], max_videos=proc['max_videos'])
     
     execution_time = time.time() - start_time
     execution_times['final_consolidation'] = execution_time
@@ -418,29 +371,10 @@ def generate_dataset_summary(args):
     analyzer = DatasetAnalyzer(DATASET_DIR)
     summary_file = analyzer.generate_and_save_summary()
     
-    rich_console.print_success(f"📊 Dataset summary saved to: {summary_file}")
+    rich_console.print_success(f"Dataset summary saved to: {summary_file}")
     
     execution_time = time.time() - start_time
     execution_times['dataset_summary'] = execution_time
-
-
-def run_web_interface(args):
-    """Run the web interface."""
-    rich_console.print_info("Starting web interface...")
-    start_time = time.time()
-    
-    app = create_app()
-    
-    # Create admin user if it doesn't exist
-    create_admin_user(app)
-    
-    # Record setup time before running the app
-    setup_time = time.time() - start_time
-    execution_times['web_setup'] = setup_time
-    rich_console.print_info(f"Web interface setup completed in {timedelta(seconds=setup_time)}")
-    
-    # Run the flask app
-    run_app()
 
 
 def print_execution_summary():
@@ -470,11 +404,7 @@ def run_vlm_stages(args):
         output_format=getattr(args, 'output_format', 'wav'),
         whisper_model_size=getattr(args, 'model_size', 'large-v3'),
         whisper_compute_type=getattr(args, 'compute_type', 'float16'),
-        whisper_batch_size=getattr(args, 'batch_size', 16),
-        enhanced_captions=getattr(args, 'enhanced', True),
-        movie_style=getattr(args, 'movie_style', True),
-        visual_context=getattr(args, 'visual_context', True),
-        enable_video_descriptions=False  # Handle video descriptions separately
+        whisper_batch_size=getattr(args, 'batch_size', 16)
     )
     rich_console.print_success("Pipeline orchestrator created successfully")
     
@@ -497,21 +427,21 @@ def run_vlm_stages(args):
     elif completed == 0:
         rich_console.print_warning("No videos completed main pipeline - skipping video descriptions")
     
-    # Run audio descriptions if enabled and completed videos exist
-    if getattr(args, 'audio_descriptions', False) and completed > 0:
+    # Run audio descriptions for completed videos
+    if completed > 0:
         rich_console.print_info("Starting audio description generation for completed videos...")
         run_audio_descriptions(args)
-        
+
         # Clean up Audio Flamingo resources after completion
         try:
             from caption_pipeline.utils.model_cleanup import model_cleanup_manager
-            rich_console.print_info("🧹 Cleaning up Audio Flamingo 3 resources...")
+            rich_console.print_info("Cleaning up Audio Flamingo 3 resources...")
             model_cleanup_manager._force_gpu_cleanup()
-            rich_console.print_success("✓ Audio Flamingo 3 cleanup completed")
+            rich_console.print_success("Audio Flamingo 3 cleanup completed")
         except Exception as e:
             rich_console.print_warning(f"Warning during Audio Flamingo cleanup: {e}")
-    elif getattr(args, 'audio_descriptions', False) and completed == 0:
-        rich_console.print_warning("Audio descriptions requested but no videos completed main pipeline")
+    else:
+        rich_console.print_warning("No videos completed main pipeline - skipping audio descriptions")
     
     # Calculate execution time
     full_execution_time = time.time() - full_start_time
@@ -617,315 +547,95 @@ def run_llm_stages(args):
     print_execution_summary()
 
 
-def run_full_pipeline(args):
-    """Run the complete pipeline using parallel processing."""
-    full_start_time = time.time()
-    
-    # Print pipeline startup information
-    rich_console.print_info("Initializing parallel video processing pipeline...")
-    rich_console.print_info(f"Command line arguments: --max-videos={args.max_videos}, --video-descriptions={args.video_descriptions}")
-    
-    # Use the parallel pipeline orchestrator
-    rich_console.print_info("Creating pipeline orchestrator with specified configuration...")
-    orchestrator = PipelineOrchestrator(
-        max_videos=args.max_videos,
-        download_workers=args.download_workers,
-        preprocess_workers=args.preprocess_workers,
-        caption_workers=args.caption_workers,
-        output_format=args.output_format,
-        whisper_model_size=args.model_size,
-        whisper_compute_type=args.compute_type,
-        whisper_batch_size=args.batch_size,
-        enhanced_captions=args.enhanced,
-        movie_style=args.movie_style,
-        visual_context=args.visual_context,
-        enable_video_descriptions=False  # Disable in orchestrator, handle separately
-    )
-    rich_console.print_success("Pipeline orchestrator created successfully")
-    
-    # Run the parallel pipeline
-    rich_console.print_info("Starting main pipeline execution...")
-    total_videos, completed, failed = orchestrator.run_pipeline()
-    
-    # Detect if both video and audio descriptions are enabled for parallel processing
-    both_descriptions_enabled = (args.video_descriptions and 
-                                getattr(args, 'audio_descriptions', False) and
-                                not getattr(args, 'disable_parallel_processing', False) and
-                                completed > 0)
-    
-    if both_descriptions_enabled:
-        # PARALLEL MODE: Process video and audio descriptions simultaneously at segment level
-        rich_console.print_warning("� Parallel processing mode detected but currently disabled due to GPU memory conflicts")
-        rich_console.print_info("🔄 Automatically switching to sequential processing for stability")
-        rich_console.print_info(f"💡 To force parallel processing, use --disable-parallel-processing=false (not recommended)")
-        
-        # Force sequential processing for now
-        both_descriptions_enabled = False
-        
-        # Set up args for parallel processing
-        if not hasattr(args, 'max_workers'):
-            args.max_workers = 8
-        
-        # Use parallel cleanup while initializing parallel processing
-        def init_parallel_processing():
-            return run_parallel_video_and_audio_descriptions(args)
-        
-        try:
-            orchestrator.cleanup_and_prepare_for_next_stage(init_parallel_processing)
-            
-            # Clean up Audio Flamingo resources after parallel completion
-            try:
-                from caption_pipeline.utils.model_cleanup import model_cleanup_manager
-                rich_console.print_info("🧹 Cleaning up Audio Flamingo 3 resources...")
-                model_cleanup_manager._force_gpu_cleanup()
-                rich_console.print_success("✓ Audio Flamingo 3 cleanup completed")
-            except Exception as e:
-                rich_console.print_warning(f"Warning during Audio Flamingo cleanup: {e}")
-        except Exception as e:
-            rich_console.print_error(f"Parallel processing failed: {e}")
-            rich_console.print_info("Falling back to sequential processing...")
-            # Fall back to sequential processing without parallel cleanup
-            if args.video_descriptions:
-                run_video_descriptions(args)
-            if getattr(args, 'audio_descriptions', False):
-                run_audio_descriptions(args)
-    
-    else:
-        # SEQUENTIAL MODE: Process video and audio descriptions separately
-        
-        # Run video descriptions if requested
-        if args.video_descriptions and completed > 0:
-            rich_console.print_info(f"Main pipeline completed. Starting video description generation for {completed} videos...")
-            # Set up args for video descriptions with proper defaults
-            if not hasattr(args, 'max_workers'):
-                args.max_workers = 8
-            
-            # Use parallel cleanup - clean up main pipeline models while initializing video descriptions
-            def init_video_descriptions():
-                return run_video_descriptions(args)
-            
-            orchestrator.cleanup_and_prepare_for_next_stage(init_video_descriptions)
-        elif args.video_descriptions and completed == 0:
-            rich_console.print_warning("Video descriptions requested but no videos completed main pipeline")
-        
-        # Run audio descriptions if enabled (only if not already done in parallel mode)
-        if getattr(args, 'audio_descriptions', False) and completed > 0:
-            rich_console.print_info("Starting audio description generation for completed videos...")
-            run_audio_descriptions(args)
-            
-            # Clean up Audio Flamingo resources after completion
-            try:
-                from caption_pipeline.utils.model_cleanup import model_cleanup_manager
-                rich_console.print_info("🧹 Cleaning up Audio Flamingo 3 resources...")
-                # Force cleanup of any remaining GPU memory 
-                model_cleanup_manager._force_gpu_cleanup()
-                rich_console.print_success("✓ Audio Flamingo 3 cleanup completed")
-            except Exception as e:
-                rich_console.print_warning(f"Warning during Audio Flamingo cleanup: {e}")
-        elif getattr(args, 'audio_descriptions', False) and completed == 0:
-            rich_console.print_warning("Audio descriptions requested but no videos completed main pipeline")
-    
-    # Run comprehensive multimodal understanding for all completed videos with descriptions
-    if completed > 0 and args.video_descriptions:
-        rich_console.print_info(f"Starting comprehensive multimodal understanding for {completed} completed videos...")
-        run_multimodal_understanding(args)
-        
-        # Run multimodal understanding alignment for improved temporal continuity
-        rich_console.print_info(f"Starting multimodal understanding alignment for {completed} completed videos...")
-        run_multimodal_understanding_alignment(args)
-    elif completed > 0 and not args.video_descriptions:
-        rich_console.print_warning("Skipping multimodal understanding - video descriptions not enabled")
-    else:
-        rich_console.print_warning("No videos completed - skipping multimodal understanding")
-    
-    # Run metadata generation for all completed videos
-    if completed > 0:
-        rich_console.print_info(f"Starting metadata generation for {completed} completed videos...")
-        run_metadata_generation(args)
-    else:
-        rich_console.print_warning("No videos completed - skipping metadata generation")
-    
-    # Run final consolidation for all completed videos (mandatory step)
-    if completed > 0:
-        rich_console.print_info(f"Starting final consolidation for {completed} completed videos...")
-        run_final_consolidation(args)
-    else:
-        rich_console.print_warning("No videos completed - skipping final consolidation")
-    
-    # Generate comprehensive dataset summary (final step)
-    if completed > 0:
-        rich_console.print_info(f"Generating comprehensive dataset summary for {completed} completed videos...")
-        generate_dataset_summary(args)
-    else:
-        rich_console.print_warning("No videos completed - skipping dataset summary generation")
-    
-    # Run web interface if requested
-    if args.web:
-        run_web_interface(args)
-    
-    # Calculate full pipeline time
-    full_execution_time = time.time() - full_start_time
-    execution_times['full_pipeline'] = full_execution_time
-    
-    # Print pipeline completion summary
-    rich_console.print_success(f"Full pipeline execution completed in {timedelta(seconds=full_execution_time)}")
-    rich_console.print_info(f"Pipeline results: {completed} completed, {failed} failed out of {total_videos} total videos")
-    
-    # Print execution summary
-    print_execution_summary()
-
-
 def main():
     """Parse arguments and run the appropriate pipeline component."""
-    parser = argparse.ArgumentParser(description='Arabic Video Dataset Pipeline')
+    parser = argparse.ArgumentParser(description='LongShOT Video Dataset Pipeline')
     subparsers = parser.add_subparsers(dest='command', help='Pipeline component to run')
-    
-    
-    # Web interface parser
-    subparsers.add_parser('web', help='Run web interface')
-    
+
+    # ========== Parent Parsers ==========
+
+    # Common parent parser for video ID filtering (all commands)
+    common_parser = argparse.ArgumentParser(add_help=False)
+    common_parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
+    common_parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
+
+    # Parent parser for LLM-based stages (alignments, multimodal, metadata)
+    llm_parser = argparse.ArgumentParser(add_help=False)
+    llm_parser.add_argument('--model', type=str, help='Language model to use')
+    llm_parser.add_argument('--api-base', type=str, help='vLLM server API base URL')
+    llm_parser.add_argument('--max-workers', type=int, default=8, help='Maximum concurrent workers (default: 8)')
+
+    # Parent parser for VLM pipeline stages (Whisper, preprocessing)
+    vlm_parser = argparse.ArgumentParser(add_help=False)
+    vlm_parser.add_argument('--download-workers', type=int, default=1, help='Parallel download workers')
+    vlm_parser.add_argument('--preprocess-workers', type=int, default=4, help='Parallel preprocessing workers')
+    vlm_parser.add_argument('--caption-workers', type=int, default=2, help='Parallel captioning workers')
+    vlm_parser.add_argument('--output-format', type=str, default='wav', choices=['wav', 'mp3'], help='Audio output format')
+    vlm_parser.add_argument('--model-size', type=str, default='large-v3',
+                           choices=['tiny', 'base', 'small', 'medium', 'large', 'large-v2', 'large-v3', 'distil-large-v3'],
+                           help='Whisper model size')
+    vlm_parser.add_argument('--compute-type', type=str, default='float16',
+                           choices=['float32', 'float16', 'int8_float16', 'int8'], help='Whisper compute type')
+    vlm_parser.add_argument('--batch-size', type=int, default=16, help='Batch size for processing')
+
+    # Parent parser for audio description stages
+    audio_parser = argparse.ArgumentParser(add_help=False)
+    audio_parser.add_argument('--audio-model-path', type=str, default=AUDIO_FLAMINGO_MODEL_PATH, help='Audio Flamingo 3 model path')
+    audio_parser.add_argument('--audio-batch-size', type=int, default=8, help='Batch size for audio processing')
+    audio_parser.add_argument('--audio-gpus', type=int, help='Number of GPUs for audio processing')
+
+    # ========== Subparsers ==========
+
     # Video descriptions parser
-    video_desc_parser = subparsers.add_parser('video-descriptions', help='Generate video descriptions')
-    video_desc_parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
-    video_desc_parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    video_desc_parser.add_argument('--model', type=str, help='Vision model to use')
-    video_desc_parser.add_argument('--api-base', type=str, help='vLLM server API base URL')
-    video_desc_parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers (default: 8)')
-    video_desc_parser.add_argument('--offline', action='store_true', help='Use offline vLLM model')
-    video_desc_parser.add_argument('--max-frames', type=int, help='Maximum frames per segment')
-    
+    video_desc_parser = subparsers.add_parser('video-descriptions', parents=[common_parser, llm_parser],
+                                              help='Generate video descriptions')
+
     # Video description alignment parser
-    alignment_parser = subparsers.add_parser('video-description-alignment', help='Align video descriptions for temporal continuity')
-    alignment_parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to align')
-    alignment_parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    alignment_parser.add_argument('--model', type=str, help='Language model to use for alignment')
-    alignment_parser.add_argument('--api-base', type=str, help='vLLM server API base URL')
-    alignment_parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers (default: 8)')
-    
+    subparsers.add_parser('video-description-alignment', parents=[common_parser, llm_parser],
+                          help='Align video descriptions for temporal continuity')
+
     # Audio description alignment parser
-    audio_alignment_parser = subparsers.add_parser('audio-description-alignment', help='Align audio descriptions for temporal and spatial continuity')
-    audio_alignment_parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to align')
-    audio_alignment_parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    audio_alignment_parser.add_argument('--model', type=str, help='Language model to use for alignment')
-    audio_alignment_parser.add_argument('--api-base', type=str, help='vLLM server API base URL')
-    audio_alignment_parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers (default: 8)')
-    audio_alignment_parser.add_argument('--context-segments', type=int, default=3, help='Number of previous segments to use as context (default: 3)')
-    audio_alignment_parser.add_argument('--list-only', action='store_true', help='Only list videos that need alignment processing')
-    
+    subparsers.add_parser('audio-description-alignment', parents=[common_parser, llm_parser],
+                          help='Align audio descriptions for temporal and spatial continuity')
+
     # Audio descriptions parser
-    audio_desc_parser = subparsers.add_parser('audio-descriptions', help='Generate audio descriptions using Audio Flamingo 3')
-    audio_desc_parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
-    audio_desc_parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
+    audio_desc_parser = subparsers.add_parser('audio-descriptions', parents=[common_parser],
+                                              help='Generate audio descriptions using Audio Flamingo 3')
     audio_desc_parser.add_argument('--model-path', type=str, default=AUDIO_FLAMINGO_MODEL_PATH, help='Path to Audio Flamingo 3 model')
     audio_desc_parser.add_argument('--batch-size', type=int, default=8, help='Batch size for processing (default: 8)')
     audio_desc_parser.add_argument('--num-gpus', type=int, help='Number of GPUs to use (default: auto-detect)')
-    audio_desc_parser.add_argument('--text-prompt', type=str, help='Custom text prompt for audio description')
-    audio_desc_parser.add_argument('--list-only', action='store_true', help='Only list videos that need processing')
-    
+
     # Multimodal understanding parser
-    multimodal_parser = subparsers.add_parser('multimodal-understanding', help='Generate comprehensive multimodal understanding')
-    multimodal_parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
-    multimodal_parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    multimodal_parser.add_argument('--max-workers', type=int, default=6, help='Maximum number of concurrent workers (default: 8)')
-    multimodal_parser.add_argument('--model', type=str, help='Language model to use')
-    multimodal_parser.add_argument('--api-base', type=str, help='vLLM server API base URL')
-    multimodal_parser.add_argument('--sequential', action='store_true', help='Process videos sequentially instead of concurrently')
-    multimodal_parser.add_argument('--list-only', action='store_true', help='Only list videos that need processing')
-    
+    subparsers.add_parser('multimodal-understanding', parents=[common_parser, llm_parser],
+                          help='Generate comprehensive multimodal understanding')
+
     # Multimodal understanding alignment parser
-    multimodal_alignment_parser = subparsers.add_parser('multimodal-understanding-alignment', help='Align multimodal understanding for temporal continuity')
-    multimodal_alignment_parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to align')
-    multimodal_alignment_parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    multimodal_alignment_parser.add_argument('--model', type=str, help='Language model to use for alignment')
-    multimodal_alignment_parser.add_argument('--api-base', type=str, help='vLLM server API base URL')
-    multimodal_alignment_parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers (default: 8)')
-    multimodal_alignment_parser.add_argument('--list-only', action='store_true', help='Only list videos that need alignment processing')
-    
+    subparsers.add_parser('multimodal-understanding-alignment', parents=[common_parser, llm_parser],
+                          help='Align multimodal understanding for temporal continuity')
+
     # Metadata generation parser
-    metadata_parser = subparsers.add_parser('metadata', help='Generate enhanced metadata')
-    metadata_parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
-    metadata_parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    metadata_parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers')
-    metadata_parser.add_argument('--model', type=str, help='Language model to use')
-    metadata_parser.add_argument('--api-base', type=str, help='vLLM server API base URL')
-    
+    subparsers.add_parser('metadata', parents=[common_parser, llm_parser],
+                          help='Generate enhanced metadata')
+
     # Final consolidation parser
-    consolidation_parser = subparsers.add_parser('consolidate', help='Create training-ready JSONL dataset files')
-    consolidation_parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to consolidate')
-    consolidation_parser.add_argument('--max-videos', type=int, help='Maximum number of videos to consolidate')
-    
+    subparsers.add_parser('consolidate', parents=[common_parser],
+                          help='Create training-ready JSONL dataset files')
+
     # Dataset summary parser
     summary_parser = subparsers.add_parser('summary', help='Generate comprehensive dataset summary and statistics')
-    summary_parser.add_argument('--output-file', type=str, help='Custom output file path for summary (default: dataset/dataset_summary.json)')
-    
-    # VLM stages parser (first set: main pipeline + video descriptions + audio descriptions)
-    vlm_stages_parser = subparsers.add_parser('vlm-stages', help='Run first set of pipeline stages using VLM model (main pipeline + video descriptions + audio descriptions)')
-    vlm_stages_parser.add_argument('--max-videos', type=int, default=None, help='Maximum number of videos to process')
-    vlm_stages_parser.add_argument('--download-workers', type=int, default=1, help='Number of parallel download workers')
-    vlm_stages_parser.add_argument('--preprocess-workers', type=int, default=4, help='Number of parallel preprocessing workers')
-    vlm_stages_parser.add_argument('--caption-workers', type=int, default=2, help='Number of parallel captioning workers')
-    vlm_stages_parser.add_argument('--output-format', type=str, default='wav', choices=['wav', 'mp3'], help='Audio output format for preprocessor')
-    vlm_stages_parser.add_argument('--model-size', type=str, default='large-v3', choices=['tiny', 'base', 'small', 'medium', 'large', 'large-v2', 'large-v3', 'distil-large-v3'], help='Whisper model size')
-    vlm_stages_parser.add_argument('--compute-type', type=str, default='float16', choices=['float32', 'float16', 'int8_float16', 'int8'], help='Compute type for Whisper model')
-    vlm_stages_parser.add_argument('--language', type=str, default='en', help='Language code (default: en)')
-    vlm_stages_parser.add_argument('--batch-size', type=int, default=16, help='Batch size for parallel processing (default: 16)')
-    vlm_stages_parser.add_argument('--enhanced', action='store_true', help='Use enhanced caption generation', default=True)
-    vlm_stages_parser.add_argument('--movie-style', action='store_true', default=True, help='Add movie-style captions like [music], [effects], etc.')
-    vlm_stages_parser.add_argument('--visual-context', action='store_true', default=True, help='Add visual scene descriptions using CLIP')
-    vlm_stages_parser.add_argument('--audio-descriptions', action='store_true', default=True, help='Generate audio descriptions for non-speech content using Audio Flamingo 3')
-    vlm_stages_parser.add_argument('--audio-model-path', type=str, default=AUDIO_FLAMINGO_MODEL_PATH, help='Path to Audio Flamingo 3 model')
-    vlm_stages_parser.add_argument('--audio-batch-size', type=int, default=8, help='Batch size for audio description processing')
-    vlm_stages_parser.add_argument('--audio-gpus', type=int, help='Number of GPUs for audio processing')
-    vlm_stages_parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers for video descriptions')
-    
-    # LLM stages parser (second set: alignment + multimodal + metadata + consolidation)
-    llm_stages_parser = subparsers.add_parser('llm-stages', help='Run second set of pipeline stages using LLM model (alignment + multimodal + metadata + consolidation)')
-    llm_stages_parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
-    llm_stages_parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    llm_stages_parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers')
-    llm_stages_parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers for metadata generation')
-    
-    # Full pipeline parser with Faster Whisper options
-    full_parser = subparsers.add_parser('full', help='Run full pipeline')
-    full_parser.add_argument('--max-videos', type=int, default=None, help='Maximum number of videos to process')
-    full_parser.add_argument('--web', action='store_true', help='Start web interface after processing')
-    full_parser.add_argument('--download-workers', type=int, default=1, help='Number of parallel download workers')
-    full_parser.add_argument('--preprocess-workers', type=int, default=4, help='Number of parallel preprocessing workers')
-    full_parser.add_argument('--caption-workers', type=int, default=2, help='Number of parallel captioning workers')
-    full_parser.add_argument('--output-format', type=str, default='wav', choices=['wav', 'mp3'], 
-                            help='Audio output format for preprocessor')
-    full_parser.add_argument('--model-size', type=str, default='large-v3', 
-                           choices=['tiny', 'base', 'small', 'medium', 'large', 'large-v2', 'large-v3', 'distil-large-v3'],
-                           help='Whisper model size')
-    full_parser.add_argument('--compute-type', type=str, default='float16',
-                           choices=['float32', 'float16', 'int8_float16', 'int8'],
-                           help='Compute type for Whisper model')
-    full_parser.add_argument('--language', type=str, default='en', help='Language code (default: ar for Arabic)')
-    full_parser.add_argument('--batch-size', type=int, default=16, 
-                           help='Batch size for parallel processing (default: 16)')
-    full_parser.add_argument('--enhanced', action='store_true', help='Use enhanced caption generation', default=True)
-    full_parser.add_argument('--movie-style', action='store_true', default=True,
-                           help='Add movie-style captions like [music], [effects], etc.')
-    full_parser.add_argument('--visual-context', action='store_true', default=True,
-                           help='Add visual scene descriptions using CLIP')
-    full_parser.add_argument('--video-descriptions', action='store_true', default=True,
-                           help='Generate visual descriptions for video segments using Qwen 2.5-VL')
-    full_parser.add_argument('--audio-descriptions', action='store_true', default=True,
-                           help='Generate audio descriptions for non-speech content using Audio Flamingo 3')
-    full_parser.add_argument('--audio-model-path', type=str, default=AUDIO_FLAMINGO_MODEL_PATH,
-                           help='Path to Audio Flamingo 3 model')
-    full_parser.add_argument('--audio-batch-size', type=int, default=8,
-                           help='Batch size for audio description processing')
-    full_parser.add_argument('--audio-gpus', type=int, help='Number of GPUs for audio processing')
-    full_parser.add_argument('--workers', type=int, default=4, 
-                           help='Number of parallel workers for metadata generation')
-    full_parser.add_argument('--disable-parallel-processing', action='store_true', default=True,
-                           help='Disable parallel processing of video and audio descriptions')
-    full_parser.add_argument('--max-workers', type=int, default=8,
-                           help='Maximum number of concurrent workers for video descriptions')
-    
+    summary_parser.add_argument('--output-file', type=str, help='Custom output file path for summary')
+
+    # VLM stages parser (main pipeline + video descriptions + audio descriptions)
+    vlm_stages_parser = subparsers.add_parser('vlm-stages', parents=[common_parser, vlm_parser, audio_parser],
+                                              help='Run VLM stages: main pipeline + video descriptions + audio descriptions')
+    vlm_stages_parser.add_argument('--max-workers', type=int, default=8, help='Concurrent workers for video descriptions')
+
+    # LLM stages parser (alignment + multimodal + metadata + consolidation)
+    subparsers.add_parser('llm-stages', parents=[common_parser, llm_parser],
+                          help='Run LLM stages: alignment + multimodal + metadata + consolidation')
+
     args = parser.parse_args()
-    
+
     if args.command == 'video-descriptions':
         run_video_descriptions(args)
     elif args.command == 'video-description-alignment':
@@ -948,10 +658,6 @@ def main():
         run_vlm_stages(args)
     elif args.command == 'llm-stages':
         run_llm_stages(args)
-    elif args.command == 'web':
-        run_web_interface(args)
-    elif args.command == 'full':
-        run_full_pipeline(args)
     else:
         parser.print_help()
 

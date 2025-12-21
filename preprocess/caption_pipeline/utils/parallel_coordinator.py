@@ -90,7 +90,7 @@ class SegmentLevelParallelCoordinator:
             True if initialization was successful
         """
         try:
-            rich_console.print_info("🚀 Starting segment-level parallel processing coordinator...")
+            rich_console.print_info("Starting segment-level parallel processing coordinator...")
             
             # Start audio descriptor initialization in background
             self.audio_init_thread = threading.Thread(
@@ -114,7 +114,7 @@ class SegmentLevelParallelCoordinator:
             self.audio_worker_thread.daemon = True
             self.audio_worker_thread.start()
             
-            rich_console.print_success("✓ Parallel processing coordinator started successfully")
+            rich_console.print_success("Parallel processing coordinator started successfully")
             return True
             
         except Exception as e:
@@ -148,7 +148,7 @@ class SegmentLevelParallelCoordinator:
                 with self.stats_lock:
                     self.stats['audio_segments_queued'] += 1
                 
-                rich_console.print_info(f"🎵 Queued audio segment for {video_id} segment {task.segment_index}")
+                rich_console.print_info(f"Queued audio segment for {video_id} segment {task.segment_index}")
         
         except Exception as e:
             rich_console.print_error(f"Error queuing audio segment for {video_id}: {e}")
@@ -195,12 +195,12 @@ class SegmentLevelParallelCoordinator:
             with self.stats_lock:
                 final_stats = self.stats.copy()
             
-            rich_console.print_success("✓ Parallel audio processing completed")
-            rich_console.print_info(f"  • Video segments processed: {final_stats['video_segments_completed']}")
-            rich_console.print_info(f"  • Audio segments queued: {final_stats['audio_segments_queued']}")
-            rich_console.print_info(f"  • Audio segments completed: {final_stats['audio_segments_completed']}")
+            rich_console.print_success("Parallel audio processing completed")
+            rich_console.print_info(f"  - Video segments processed: {final_stats['video_segments_completed']}")
+            rich_console.print_info(f"  - Audio segments queued: {final_stats['audio_segments_queued']}")
+            rich_console.print_info(f"  - Audio segments completed: {final_stats['audio_segments_completed']}")
             if final_stats['audio_segments_failed'] > 0:
-                rich_console.print_warning(f"  • Audio segments failed: {final_stats['audio_segments_failed']}")
+                rich_console.print_warning(f"  - Audio segments failed: {final_stats['audio_segments_failed']}")
             
             return final_stats
             
@@ -211,7 +211,7 @@ class SegmentLevelParallelCoordinator:
     def shutdown(self) -> None:
         """Shutdown the parallel processing coordinator and clean up resources."""
         try:
-            rich_console.print_info("🛑 Shutting down parallel processing coordinator...")
+            rich_console.print_info("Shutting down parallel processing coordinator...")
             
             # Signal shutdown
             self.shutdown_event.set()
@@ -235,7 +235,7 @@ class SegmentLevelParallelCoordinator:
                     rich_console.print_warning(f"Warning during audio descriptor cleanup: {e}")
                 self.audio_descriptor = None
             
-            rich_console.print_success("✓ Parallel processing coordinator shutdown completed")
+            rich_console.print_success("Parallel processing coordinator shutdown completed")
             
         except Exception as e:
             rich_console.print_warning(f"Warning during coordinator shutdown: {e}")
@@ -243,7 +243,7 @@ class SegmentLevelParallelCoordinator:
     def _initialize_audio_descriptor(self) -> None:
         """Initialize Audio Flamingo 3 in background thread."""
         try:
-            rich_console.print_info("🎵 Initializing Audio Flamingo 3 in background...")
+            rich_console.print_info("Initializing Audio Flamingo 3 in background...")
             
             # Import here to avoid circular imports
             from caption_pipeline.pipeline.audio_descriptor import AudioDescriptor
@@ -251,7 +251,7 @@ class SegmentLevelParallelCoordinator:
             self.audio_descriptor = AudioDescriptor(**self.audio_descriptor_config)
             self.audio_init_event.set()
             
-            rich_console.print_success("✓ Audio Flamingo 3 initialization completed")
+            rich_console.print_success("Audio Flamingo 3 initialization completed")
             
         except Exception as e:
             rich_console.print_error(f"Failed to initialize Audio Flamingo 3: {e}")
@@ -259,7 +259,7 @@ class SegmentLevelParallelCoordinator:
     
     def _audio_processing_worker(self) -> None:
         """Worker thread that processes audio segments from the queue."""
-        rich_console.print_info("🎵 Audio processing worker started")
+        rich_console.print_info("Audio processing worker started")
         
         while not self.shutdown_event.is_set():
             try:
@@ -312,7 +312,7 @@ class SegmentLevelParallelCoordinator:
                 rich_console.print_error(f"Error in audio processing worker: {e}")
                 continue
         
-        rich_console.print_info("🎵 Audio processing worker stopped")
+        rich_console.print_info("Audio processing worker stopped")
     
     def _process_audio_segment(self, task: SegmentProcessingTask) -> bool:
         """Process a single audio segment with Audio Flamingo 3."""
@@ -331,10 +331,10 @@ class SegmentLevelParallelCoordinator:
             result = self.audio_descriptor.generate_audio_descriptions_pipeline(task.video_id)
             
             if result:
-                rich_console.print_info(f"✓ Completed audio processing for {task.video_id} segment {task.segment_index}")
+                rich_console.print_info(f"Completed audio processing for {task.video_id} segment {task.segment_index}")
                 return True
             else:
-                rich_console.print_warning(f"⚠️ Audio processing failed for {task.video_id} segment {task.segment_index}")
+                rich_console.print_warning(f"Audio processing failed for {task.video_id} segment {task.segment_index}")
                 return False
                 
         except Exception as e:

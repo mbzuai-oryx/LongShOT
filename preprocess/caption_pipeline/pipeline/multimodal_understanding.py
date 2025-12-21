@@ -21,6 +21,9 @@ from config import (LLM_MODEL, LLM_SERVER_URL,
 # Import rich console utilities
 from caption_pipeline.utils.rich_console import get_console
 
+# Import common VLM utilities
+from caption_pipeline.utils.vlm_common import load_aligned_json, load_json_file
+
 # Try to import vLLM components
 try:
     from openai import OpenAI
@@ -118,61 +121,17 @@ class MultimodalVideoUnderstanding:
     
     def _load_captions_data(self, video_id: str) -> Dict:
         """Load caption data for a video."""
-        captions_file = os.path.join(CAPTIONS_DIR, f"{video_id}.json")
-        try:
-            with open(captions_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Error loading captions for video {video_id}: {e}")
-            return {}
+        return load_json_file(os.path.join(CAPTIONS_DIR, f"{video_id}.json")) or {}
     
     def _load_video_descriptions_data(self, video_id: str) -> Dict:
         """Load video descriptions data for a video."""
-        # Try aligned version first, fall back to non-aligned
-        aligned_file = os.path.join(VIDEO_DESCRIPTIONS_DIR, f"{video_id}_descriptions_aligned.json")
-        non_aligned_file = os.path.join(VIDEO_DESCRIPTIONS_DIR, f"{video_id}_descriptions.json")
-        
-        try:
-            if os.path.exists(aligned_file):
-                with open(aligned_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            elif os.path.exists(non_aligned_file):
-                logger.warning(f"Using non-aligned video descriptions for {video_id}")
-                with open(non_aligned_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            else:
-                logger.error(f"No video descriptions file found for {video_id}")
-                return {}
-        except Exception as e:
-            logger.error(f"Error loading video descriptions for video {video_id}: {e}")
-            return {}
+        base_path = os.path.join(VIDEO_DESCRIPTIONS_DIR, f"{video_id}_descriptions")
+        return load_aligned_json(base_path) or {}
     
     def _load_audio_descriptions_data(self, video_id: str) -> Dict:
         """Load audio descriptions data for a video, preferring aligned files."""
-        # First try to load aligned audio descriptions
-        aligned_audio_descriptions_file = os.path.join(AUDIO_DESCRIPTIONS_DIR, f"{video_id}_audio_descriptions_aligned.json")
-        audio_descriptions_file = os.path.join(AUDIO_DESCRIPTIONS_DIR, f"{video_id}_audio_descriptions.json")
-        
-        # Prefer aligned file if it exists
-        if os.path.exists(aligned_audio_descriptions_file):
-            try:
-                with open(aligned_audio_descriptions_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    logger.debug(f"Loaded aligned audio descriptions for video {video_id}")
-                    return data
-            except Exception as e:
-                logger.warning(f"Failed to load aligned audio descriptions for video {video_id}: {e}")
-                # Fall back to original file
-        
-        # Fall back to original audio descriptions file
-        try:
-            with open(audio_descriptions_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                logger.debug(f"Loaded original audio descriptions for video {video_id}")
-                return data
-        except Exception as e:
-            logger.debug(f"No audio descriptions found for video {video_id}: {e}")
-            return {}
+        base_path = os.path.join(AUDIO_DESCRIPTIONS_DIR, f"{video_id}_audio_descriptions")
+        return load_aligned_json(base_path) or {}
     
     def _find_temporal_matches(self, captions_data: Dict, video_descriptions_data: Dict, 
                               audio_descriptions_data: Dict) -> List[Dict]:
@@ -267,41 +226,47 @@ class MultimodalVideoUnderstanding:
             logger.error(f"Error generating multimodal understanding: {e}")
             return f"Error generating comprehensive understanding: {str(e)}"
     
-    def _process_single_segment(self, segment_data: Dict, segment_index: int) -> Dict:
-        """Process a single segment to generate multimodal understanding."""
-        start_time = time.time()
-        
-        # Generate multimodal understanding
-        multimodal_understanding = self._generate_multimodal_understanding(segment_data)
-        
-        processing_time = time.time() - start_time
-        
-        return {
-            'segment_index': segment_index,
-            'start': segment_data['start'],
-            'end': segment_data['end'],
-            'duration': segment_data['duration'],
-            'multimodal_understanding': multimodal_understanding,
-            'source_modalities': {
-                'speech_content': segment_data['speech_content'],
-                'visual_description': segment_data['visual_description'],
-                'audio_environment': segment_data['audio_environment']
-            },
-            'processing_time': processing_time,
-            'processing_method': 'multimodal_vllm_integration',
-            'timestamp': datetime.now().isoformat()
-        }
+    def _process_segments_concurrent(self, unified_segments: List[Dict], video_id: str) -> List[Dict]:
+        """Process segments concurrently to generate multimodal understanding."""
+        processed_segments = []
+
+        def process_segment(segment_data: Dict, segment_index: int) -> Dict:
+            """Process a single segment."""
+            seg_start = time.time()
+            multimodal_understanding = self._generate_multimodal_understanding(segment_data)
+            return {
+                'segment_index': segment_index,
+                'start': segment_data['start'],
+                'end': segment_data['end'],
+                'duration': segment_data['duration'],
+                'multimodal_understanding': multimodal_understanding,
+                'source_modalities': {
+                    'speech_content': segment_data['speech_content'],
+                    'visual_description': segment_data['visual_description'],
+                    'audio_environment': segment_data['audio_environment']
+                },
+                'processing_time': time.time() - seg_start,
+                'processing_method': 'multimodal_vllm_integration',
+                'timestamp': datetime.now().isoformat()
+            }
+
+        with ThreadPoolExecutor(max_workers=min(self.max_workers, len(unified_segments))) as executor:
+            future_to_segment = {
+                executor.submit(process_segment, segment, idx): idx
+                for idx, segment in enumerate(unified_segments)
+            }
+
+            for future in as_completed(future_to_segment):
+                segment_idx = future_to_segment[future]
+                try:
+                    processed_segments.append(future.result())
+                except Exception as e:
+                    logger.error(f"Error processing segment {segment_idx} for video {video_id}: {e}")
+
+        return processed_segments
     
-    def process_video(self, video_id: str) -> bool:
-        """
-        Process a single video to generate comprehensive multimodal understanding.
-        
-        Args:
-            video_id: ID of the video to process
-            
-        Returns:
-            bool: True if successful, False otherwise
-        """
+    def _process_video(self, video_id: str) -> bool:
+        """Process a single video to generate comprehensive multimodal understanding."""
         start_time = time.time()
         
         try:
@@ -323,54 +288,10 @@ class MultimodalVideoUnderstanding:
             if not unified_segments:
                 rich_console.print_warning(f"No aligned segments found for video {video_id}")
                 return False
-            
-            # Only show segment progress for videos with many segments
-            show_segment_progress = len(unified_segments) > 5
-            
-            if show_segment_progress:
-                # Create progress bar for segment processing
-                segment_progress, segment_task_id = rich_console.create_video_segment_progress(video_id, len(unified_segments))
-            
-            # Process segments concurrently with optional progress tracking
-            processed_segments = []
-            
-            if show_segment_progress:
-                with segment_progress:
-                    with ThreadPoolExecutor(max_workers=min(self.max_workers, len(unified_segments))) as executor:
-                        # Submit all segment processing tasks
-                        future_to_segment = {
-                            executor.submit(self._process_single_segment, segment, idx): idx
-                            for idx, segment in enumerate(unified_segments)
-                        }
-                        
-                        # Collect results with progress updates
-                        for future in as_completed(future_to_segment):
-                            try:
-                                result = future.result()
-                                processed_segments.append(result)
-                                segment_progress.update(segment_task_id, advance=1)
-                            except Exception as e:
-                                segment_idx = future_to_segment[future]
-                                logger.error(f"Error processing segment {segment_idx} for video {video_id}: {e}")
-                                segment_progress.update(segment_task_id, advance=1)
-            else:
-                # Process without progress bar for small videos
-                with ThreadPoolExecutor(max_workers=min(self.max_workers, len(unified_segments))) as executor:
-                    # Submit all segment processing tasks
-                    future_to_segment = {
-                        executor.submit(self._process_single_segment, segment, idx): idx
-                        for idx, segment in enumerate(unified_segments)
-                    }
-                    
-                    # Collect results
-                    for future in as_completed(future_to_segment):
-                        try:
-                            result = future.result()
-                            processed_segments.append(result)
-                        except Exception as e:
-                            segment_idx = future_to_segment[future]
-                            logger.error(f"Error processing segment {segment_idx} for video {video_id}: {e}")
-            
+
+            # Process segments concurrently
+            processed_segments = self._process_segments_concurrent(unified_segments, video_id)
+
             # Sort segments by index to maintain order
             processed_segments.sort(key=lambda x: x['segment_index'])
             
@@ -401,7 +322,7 @@ class MultimodalVideoUnderstanding:
             # Rich success message with timing info
             duration_str = f"{total_processing_time:.1f}s"
             segments_per_sec = len(processed_segments) / total_processing_time if total_processing_time > 0 else 0
-            rich_console.print_success(f"✨ Generated multimodal understanding for {video_id}: {len(processed_segments)} segments in {duration_str} ({segments_per_sec:.1f} segments/s)")
+            rich_console.print_success(f"Generated multimodal understanding for {video_id}: {len(processed_segments)} segments in {duration_str} ({segments_per_sec:.1f} segments/s)")
             return True
             
         except Exception as e:
@@ -409,90 +330,53 @@ class MultimodalVideoUnderstanding:
             logger.error(f"Error processing video {video_id}: {e}")
             return False
     
-    def process_videos(self, video_ids: List[str] = None, max_videos: int = None,
-                      use_concurrent: bool = True) -> Dict[str, bool]:
+    def process_videos(self, video_ids: List[str] = None, max_videos: int = None) -> Dict[str, bool]:
         """
         Process multiple videos for multimodal understanding generation.
-        
+
         Args:
             video_ids: List of specific video IDs to process, or None for all available
             max_videos: Maximum number of videos to process
-            use_concurrent: Whether to use concurrent processing
-            
+
         Returns:
             Dictionary mapping video IDs to success status
         """
         # Find videos to process
         if video_ids is None:
-            # Use the method that properly filters out already processed videos
-            available_videos = self.get_videos_needing_processing()
-            
+            video_ids = self.get_videos_needing_processing()
             if max_videos:
-                available_videos = available_videos[:max_videos]
-            
-            video_ids = available_videos
-        
+                video_ids = video_ids[:max_videos]
+
         if not video_ids:
             rich_console.print_warning("No videos found for multimodal understanding processing")
             return {}
-        
-        # Create rich progress bar for overall processing (simpler version)
-        if len(video_ids) > 1:
-            progress, task_id = rich_console.create_multimodal_understanding_progress(len(video_ids))
-        else:
-            progress, task_id = None, None
-        
+
         results = {}
-        
-        if progress:
-            with progress:
-                if use_concurrent and len(video_ids) > 1:
-                    # Process videos concurrently
-                    with ThreadPoolExecutor(max_workers=min(self.max_workers // 2, len(video_ids))) as executor:
-                        future_to_video = {
-                            executor.submit(self.process_video, video_id): video_id
-                            for video_id in video_ids
-                        }
-                        
-                        for future in as_completed(future_to_video):
-                            video_id = future_to_video[future]
-                            try:
-                                success = future.result()
-                                results[video_id] = success
-                                
-                                # Update progress with current video status
-                                status = "✓ Completed" if success else "✗ Failed"
-                                progress.update(task_id, advance=1, status=f"{video_id}: {status}")
-                                
-                            except Exception as e:
-                                rich_console.print_error(f"Error processing video {video_id}: {e}")
-                                results[video_id] = False
-                                progress.update(task_id, advance=1, status=f"{video_id}: ✗ Error")
-                else:
-                    # Process videos sequentially
-                    for i, video_id in enumerate(video_ids):
-                        progress.update(task_id, status=f"Processing {video_id}...")
-                        success = self.process_video(video_id)
-                        results[video_id] = success
-                        
-                        status = "✓ Completed" if success else "✗ Failed"
-                        progress.update(task_id, advance=1, status=f"{video_id}: {status}")
-        else:
-            # Single video - no main progress bar
-            for video_id in video_ids:
-                success = self.process_video(video_id)
-                results[video_id] = success
-        
+
+        # Process videos concurrently
+        with ThreadPoolExecutor(max_workers=min(self.max_workers // 2, len(video_ids))) as executor:
+            future_to_video = {
+                executor.submit(self._process_video, video_id): video_id
+                for video_id in video_ids
+            }
+
+            for future in as_completed(future_to_video):
+                video_id = future_to_video[future]
+                try:
+                    results[video_id] = future.result()
+                except Exception as e:
+                    rich_console.print_error(f"Error processing video {video_id}: {e}")
+                    results[video_id] = False
+
         # Summary
         successful = sum(1 for success in results.values() if success)
         total = len(results)
-        
-        # Enhanced summary with rich output
+
         if successful == total:
-            rich_console.print_success(f"🎯 Multimodal understanding complete: {successful}/{total} videos processed successfully")
+            rich_console.print_success(f"Multimodal understanding complete: {successful}/{total} videos processed successfully")
         else:
-            rich_console.print_warning(f"⚠️  Multimodal understanding complete: {successful}/{total} videos processed successfully, {total - successful} failed")
-        
+            rich_console.print_warning(f"Multimodal understanding complete: {successful}/{total} videos, {total - successful} failed")
+
         return results
     
     def get_videos_needing_processing(self) -> List[str]:
@@ -534,41 +418,3 @@ class MultimodalVideoUnderstanding:
         except Exception as e:
             logger.error(f"Error scanning for videos needing processing: {e}")
             return []
-
-
-def main():
-    """Main function for standalone usage."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Generate comprehensive multimodal video understanding')
-    parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
-    parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers')
-    parser.add_argument('--model', type=str, default=LLM_MODEL, help='Model to use')
-    parser.add_argument('--api-base', type=str, default=LLM_SERVER_URL, help='vLLM server API base URL')
-    parser.add_argument('--sequential', action='store_true', help='Process videos sequentially instead of concurrently')
-    
-    args = parser.parse_args()
-    
-    # Initialize processor
-    processor = MultimodalVideoUnderstanding(
-        model_name=args.model,
-        api_base=args.api_base,
-        max_workers=args.max_workers
-    )
-    
-    # Process videos
-    results = processor.process_videos(
-        video_ids=args.video_ids,
-        max_videos=args.max_videos,
-        use_concurrent=not args.sequential
-    )
-    
-    # Print summary
-    successful = sum(1 for success in results.values() if success)
-    total = len(results)
-    print(f"\nProcessing complete: {successful}/{total} videos processed successfully")
-
-
-if __name__ == "__main__":
-    main()

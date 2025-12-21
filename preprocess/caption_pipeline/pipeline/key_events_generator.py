@@ -10,8 +10,8 @@ import os
 import json
 import time
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Dict, Optional
 import sys
 
 # Import project configuration
@@ -21,8 +21,10 @@ from config import LLM_MODEL, LLM_SERVER_URL, MULTIMODAL_UNDERSTANDING_DIR, KEY_
 # Import rich console utilities
 from caption_pipeline.utils.rich_console import get_console
 
-# Import required components
-from openai import OpenAI
+# Import common VLM utilities
+from caption_pipeline.utils.vlm_common import (
+    create_vllm_client, load_aligned_json, collect_concurrent_results
+)
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -88,95 +90,32 @@ class KeyEventsGenerator:
         
         rich_console.print_info(f"Key Events Generator initialized with model: {model_name}")
         rich_console.print_info(f"Using API base: {self.api_base}")
-    
-    def _test_connection(self):
-        """Test connection to vLLM server."""
-        try:
-            client = OpenAI(api_key="token-abc123", base_url=self.api_base)
-            client.chat.completions.create(
-                model=self.model_name,
-                messages=[{"role": "user", "content": "Test"}],
-                max_tokens=5
-            )
-            rich_console.print_info(f"vLLM server connection successful at {self.api_base}")
-        except Exception as e:
-            rich_console.print_error(f"Failed to connect to vLLM server: {e}")
-            raise
-    
+
     def _load_aligned_descriptions(self, video_id: str) -> Optional[Dict]:
         """Load and combine aligned descriptions from multiple sources.
-        
+
         Args:
             video_id: The video ID to load descriptions for
-            
+
         Returns:
             Combined data structure with all available descriptions, or None if failed
         """
-        # Try to load video descriptions (aligned if available)
-        video_descriptions_data = None
-        video_descriptions_source = None
-        
-        aligned_video_file = os.path.join(VIDEO_DESCRIPTIONS_DIR, f"{video_id}_descriptions_aligned.json")
-        video_file = os.path.join(VIDEO_DESCRIPTIONS_DIR, f"{video_id}_descriptions.json")
-        
-        if os.path.exists(aligned_video_file):
-            try:
-                with open(aligned_video_file, 'r', encoding='utf-8') as f:
-                    video_descriptions_data = json.load(f)
-                    video_descriptions_source = "aligned"
-            except Exception as e:
-                rich_console.print_warning(f"Error loading aligned video descriptions: {e}")
-        elif os.path.exists(video_file):
-            try:
-                with open(video_file, 'r', encoding='utf-8') as f:
-                    video_descriptions_data = json.load(f)
-                    video_descriptions_source = "original"
-            except Exception as e:
-                rich_console.print_warning(f"Error loading video descriptions: {e}")
-        
-        # Try to load audio descriptions (aligned if available)
-        audio_descriptions_data = None
-        audio_descriptions_source = None
-        
-        aligned_audio_file = os.path.join(AUDIO_DESCRIPTIONS_DIR, f"{video_id}_audio_descriptions_aligned.json")
-        audio_file = os.path.join(AUDIO_DESCRIPTIONS_DIR, f"{video_id}_audio_descriptions.json")
-        
-        if os.path.exists(aligned_audio_file):
-            try:
-                with open(aligned_audio_file, 'r', encoding='utf-8') as f:
-                    audio_descriptions_data = json.load(f)
-                    audio_descriptions_source = "aligned"
-            except Exception as e:
-                rich_console.print_warning(f"Error loading aligned audio descriptions: {e}")
-        elif os.path.exists(audio_file):
-            try:
-                with open(audio_file, 'r', encoding='utf-8') as f:
-                    audio_descriptions_data = json.load(f)
-                    audio_descriptions_source = "original"
-            except Exception as e:
-                rich_console.print_warning(f"Error loading audio descriptions: {e}")
-        
-        # Try to load multimodal understanding (aligned if available)
-        multimodal_data = None
-        multimodal_source = None
-        
-        aligned_multimodal_file = os.path.join(MULTIMODAL_UNDERSTANDING_DIR, f"{video_id}_multimodal_understanding_aligned.json")
-        multimodal_file = os.path.join(MULTIMODAL_UNDERSTANDING_DIR, f"{video_id}_multimodal_understanding.json")
-        
-        if os.path.exists(aligned_multimodal_file):
-            try:
-                with open(aligned_multimodal_file, 'r', encoding='utf-8') as f:
-                    multimodal_data = json.load(f)
-                    multimodal_source = "aligned"
-            except Exception as e:
-                rich_console.print_warning(f"Error loading aligned multimodal understanding: {e}")
-        elif os.path.exists(multimodal_file):
-            try:
-                with open(multimodal_file, 'r', encoding='utf-8') as f:
-                    multimodal_data = json.load(f)
-                    multimodal_source = "original"
-            except Exception as e:
-                rich_console.print_warning(f"Error loading multimodal understanding: {e}")
+        # Data sources configuration: (name, directory, file_suffix)
+        data_sources = [
+            ('video', VIDEO_DESCRIPTIONS_DIR, '_descriptions'),
+            ('audio', AUDIO_DESCRIPTIONS_DIR, '_audio_descriptions'),
+            ('multimodal', MULTIMODAL_UNDERSTANDING_DIR, '_multimodal_understanding')
+        ]
+
+        # Load all sources using shared utility
+        loaded_data = {}
+        for name, directory, suffix in data_sources:
+            base_path = os.path.join(directory, f"{video_id}{suffix}")
+            loaded_data[name] = load_aligned_json(base_path, console=rich_console)
+
+        video_descriptions_data = loaded_data['video']
+        audio_descriptions_data = loaded_data['audio']
+        multimodal_data = loaded_data['multimodal']
         
         # Check if we have at least one data source
         if not any([video_descriptions_data, audio_descriptions_data, multimodal_data]):
@@ -234,16 +173,20 @@ class KeyEventsGenerator:
             'video_id': video_id,
             'segments': combined_segments,
             'metadata': base_data.get('metadata', {}),
-            'video_descriptions_source': video_descriptions_source,
-            'audio_descriptions_source': audio_descriptions_source,
-            'multimodal_understanding_source': multimodal_source
+            'video_descriptions_source': 'loaded' if video_descriptions_data else None,
+            'audio_descriptions_source': 'loaded' if audio_descriptions_data else None,
+            'multimodal_understanding_source': 'loaded' if multimodal_data else None
         }
-        
-        rich_console.print_info(f"Loaded data for {video_id}:")
-        rich_console.print_info(f"  - Video descriptions: {video_descriptions_source or 'Not available'}")
-        rich_console.print_info(f"  - Audio descriptions: {audio_descriptions_source or 'Not available'}")
-        rich_console.print_info(f"  - Multimodal understanding: {multimodal_source or 'Not available'}")
-        rich_console.print_info(f"  - Total segments: {len(combined_segments)}")
+
+        # Log available sources
+        sources = []
+        if video_descriptions_data:
+            sources.append("video")
+        if audio_descriptions_data:
+            sources.append("audio")
+        if multimodal_data:
+            sources.append("multimodal")
+        rich_console.print_info(f"Loaded {len(combined_segments)} segments for {video_id} from: {', '.join(sources)}")
         
         return combined_data
     
@@ -364,68 +307,48 @@ class KeyEventsGenerator:
     
     def _process_key_events_concurrent(self, generation_tasks: List[Dict]) -> List[List[str]]:
         """Process key events generation tasks concurrently."""
-        generated_events = []
-        
         if not generation_tasks:
-            return generated_events
-        
+            return []
+
         rich_console.print_info(f"Processing {len(generation_tasks)} key events tasks with {self.max_workers} workers")
-        
+
         # Create progress tracking
         try:
             progress, task_id = rich_console.create_key_events_progress("Key Events", len(generation_tasks))
-        except:
+        except Exception:
             progress, task_id = None, None
-        
+
         # Process key events generation concurrently
         max_concurrent = min(len(generation_tasks), self.max_workers)
         with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
-            # Submit all generation requests
-            future_to_index = {}
-            for i, task in enumerate(generation_tasks):
-                future = executor.submit(self._generate_single_key_events, 
-                                       task['visual_description'], 
-                                       task['audio_environment'],
-                                       task['speech_content'],
-                                       task['multimodal_understanding'])
-                future_to_index[future] = i
-            
-            # Initialize results with None values
-            generated_events = [None] * len(generation_tasks)
-            
-            # Collect results with progress tracking
-            completed_count = 0
+            future_to_index = {
+                executor.submit(
+                    self._generate_single_key_events,
+                    task['visual_description'],
+                    task['audio_environment'],
+                    task['speech_content'],
+                    task['multimodal_understanding']
+                ): i
+                for i, task in enumerate(generation_tasks)
+            }
+
+            # Use shared utility for result collection with progress
             if progress:
                 with progress:
-                    for future in as_completed(future_to_index):
-                        index = future_to_index[future]
-                        try:
-                            key_events = future.result()
-                            generated_events[index] = key_events
-                            completed_count += 1
-                            progress.update(task_id, advance=1)
-                        except Exception as e:
-                            rich_console.print_error(f"Error generating key events for segment {index}: {e}")
-                            generated_events[index] = "GENERATION_ERROR"
+                    return collect_concurrent_results(
+                        future_to_index, progress, task_id,
+                        error_value="GENERATION_ERROR", console=rich_console
+                    )
             else:
-                for future in as_completed(future_to_index):
-                    index = future_to_index[future]
-                    try:
-                        key_events = future.result()
-                        generated_events[index] = key_events
-                        completed_count += 1
-                        rich_console.print_info(f"Completed key events generation {completed_count}/{len(generation_tasks)}")
-                    except Exception as e:
-                        rich_console.print_error(f"Error generating key events for segment {index}: {e}")
-                        generated_events[index] = "GENERATION_ERROR"
-        
-        return generated_events
+                return collect_concurrent_results(
+                    future_to_index, error_value="GENERATION_ERROR", console=rich_console
+                )
     
-    def _generate_single_key_events(self, visual_description: str, audio_environment: str, 
+    def _generate_single_key_events(self, visual_description: str, audio_environment: str,
                                    speech_content: str, multimodal_understanding: str) -> List[str]:
         """Generate key events for a single segment."""
         try:
-            client = OpenAI(api_key="token-abc123", base_url=self.api_base)
+            client = create_vllm_client(self.api_base)
             
             # Create prompt for key events extraction
             prompt = KEY_EVENTS_EXTRACTION_PROMPT.format(
@@ -584,13 +507,13 @@ class KeyEventsGenerator:
                 key_events_file = self.generate_key_events_for_video(video_id)
                 if key_events_file:
                     key_events_files.append(key_events_file)
-                    rich_console.print_success(f"✓ Successfully generated key events for {video_id} ({i}/{len(videos_to_process)})")
+                    rich_console.print_success(f"Successfully generated key events for {video_id} ({i}/{len(videos_to_process)})")
                 else:
                     failed_videos.append(video_id)
-                    rich_console.print_error(f"✗ Failed to generate key events for {video_id} ({i}/{len(videos_to_process)})")
+                    rich_console.print_error(f"Failed to generate key events for {video_id} ({i}/{len(videos_to_process)})")
             except Exception as e:
                 failed_videos.append(video_id)
-                rich_console.print_error(f"✗ Error generating key events for {video_id}: {e}")
+                rich_console.print_error(f"Error generating key events for {video_id}: {e}")
         
         # Print summary
         success_count = len(key_events_files)
@@ -603,38 +526,5 @@ class KeyEventsGenerator:
         
         if failed_videos:
             rich_console.print_warning(f"Failed to generate key events for: {', '.join(failed_videos)}")
-        
+
         return key_events_files
-
-
-def main():
-    """Main function for testing the key events generator."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Generate key events from aligned descriptions')
-    parser.add_argument('--video-ids', nargs='+', help='Specific video IDs to process')
-    parser.add_argument('--max-videos', type=int, help='Maximum number of videos to process')
-    parser.add_argument('--model', type=str, default=LLM_MODEL, help='Language model to use')
-    parser.add_argument('--api-base', type=str, default=LLM_SERVER_URL, help='vLLM server API base URL')
-    parser.add_argument('--max-workers', type=int, default=8, help='Maximum number of concurrent workers')
-    
-    args = parser.parse_args()
-    
-    # Initialize generator
-    generator = KeyEventsGenerator(
-        model_name=args.model,
-        api_base=args.api_base,
-        max_workers=args.max_workers
-    )
-    
-    # Process key events generation
-    key_events_files = generator.batch_generate_key_events(
-        video_ids=args.video_ids,
-        max_videos=args.max_videos
-    )
-    
-    rich_console.print_info(f"Successfully generated key events for {len(key_events_files)} videos")
-
-
-if __name__ == "__main__":
-    main()
