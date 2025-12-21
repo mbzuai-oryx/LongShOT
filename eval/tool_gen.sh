@@ -12,16 +12,16 @@ TASK_NAME=postvalid_tools_v1
 OUTPUT_DIR=results_tools
 NUM_WORKERS=4
 
-# export CUDA_VISIBLE_DEVICES="2,3"
+# export CUDA_VISIBLE_DEVICES="0,1,2,3"
 
 # Accept parameter for number of models to run (default: all)
 NUM_MODELS=${1:-}
 
 MODELS=(
-# "llava-hf/llava-onevision-qwen2-7b-ov-hf:4"
-# "llava-hf/LLaVA-NeXT-Video-7B-hf:4"
-# "OpenGVLab/InternVL3_5-8B:4" #Complete
-# "Qwen/Qwen2.5-Omni-7B:4"
+"llava-hf/llava-onevision-qwen2-7b-ov-hf:4"
+"llava-hf/LLaVA-NeXT-Video-7B-hf:4"
+"OpenGVLab/InternVL3_5-8B:4"
+"Qwen/Qwen2.5-Omni-7B:4"
 "Qwen/Qwen2.5-VL-7B-Instruct:4"
 )
 

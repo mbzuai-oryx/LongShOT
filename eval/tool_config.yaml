@@ -52,13 +52,3 @@ system:
   system_prompt: ""  # Optional system prompt
   dataset_limit: 0  # Set to 0 for unlimited, positive number for limit
   server_check_timeout: 5  # Timeout for server readiness checks
-
-# VideoRAG Configuration
-videorag:
-  working_dir: "./videorag_workdir"  # Directory where VideoRAG stores indexed videos
-  enabled: true  # Enable VideoRAG functionality
-  model_name: "Qwen/Qwen3-4B-Instruct-2507"  # LLM model to use with VideoRAG
-  video_segment_length: 30  # Video segment length in seconds
-  retrieval_topk: 4  # Number of top segments to retrieve
-  chunk_token_size: 1200  # Token size for text chunks
-  # Note: VideoRAG uses sentence-transformers (all-MiniLM-L6-v2) for embeddings

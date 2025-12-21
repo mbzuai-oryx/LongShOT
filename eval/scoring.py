@@ -3,123 +3,164 @@ import time
 from datetime import datetime
 from utils import load_jsonl, save_timing_data
 
+# Task categories in display order
+TASK_CATEGORIES = {
+    "Core Perception Tasks": [
+        "entity_recognition",
+        "event_understanding",
+        "temporal_reasoning",
+        "audio_understanding"
+    ],
+    "Reasoning Tasks": [
+        "causal_reasoning",
+        "quantitative_reasoning",
+        "compositional_reasoning",
+        "comparative_analysis"
+    ],
+    "Information Tasks": [
+        "information_retrieval",
+        "summarization",
+        "instruction_extraction",
+        "sentiment_analysis"
+    ],
+    "Multimodal Tasks": [
+        "multimodal_synthesis",
+        "cross_modal_verification",
+        "audio_visual_alignment",
+        "motion_analysis"
+    ]
+}
 
-def calculate_and_save_scores(args, model_name, model_name_underscored, test_types, tasks_to_load, 
-                            timing_results, overall_start_time, get_file_paths):
+# Flat ordered list of all tasks
+TASK_ORDER = [task for tasks in TASK_CATEGORIES.values() for task in tasks]
+
+
+def calculate_and_save_scores(args, model_name, model_name_underscored, tasks_to_load,
+                            timing_results, overall_start_time, eval_file):
     """
     Calculate scores for evaluation results and save them to file.
-    
+
     Args:
         args: Command line arguments object
         model_name: Name of the model being evaluated
         model_name_underscored: Underscored version of model name for file paths
-        test_types: List of test types to process
         tasks_to_load: List of tasks that were evaluated
         timing_results: Dictionary to store timing information
         overall_start_time: Start time of the overall evaluation
-        get_file_paths: Function to get output and eval file paths for a test type
+        eval_file: Path to the evaluation results file
     """
     # Scoring phase timing
     scoring_start_time = time.time()
-    
-    print("\nAggregating video benchmark results...")
-    print(tasks_to_load)
-    
+
     score_file = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}_score.txt")
     timing_file = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}_timing.json")
-    normal_results = []
-    
-    for test_type in test_types:
-        _, eval_file = get_file_paths(test_type)
-        
-        if not os.path.exists(eval_file):
-            print(f"Warning: Evaluation file not found: {eval_file}")
-            continue
-        
+
+    all_task_accuracies = {}
+
+    if not os.path.exists(eval_file):
+        print(f"Warning: Evaluation file not found: {eval_file}")
+    else:
         eval_results = load_jsonl(eval_file)
-        if not eval_results:
-            continue
-        
-        # Calculate scores
-        task_performance = {}
-        for result in eval_results:
-            task_type = result.get('task', 'unknown_task')
-            if task_type not in task_performance:
-                task_performance[task_type] = {"score_obtained": 0, "score_total": 0}
-            
-            obtained_score = 0
-            max_score = 0
-            
-            for turn in result['conversations']:
-                if turn['role'] == 'assistant':
-                    for criteria in turn['criteria']:
-                        if criteria['criteria_met'] and not criteria['is_penalty']:
-                            obtained_score += criteria['weight']
-                        max_score += criteria['weight'] if criteria['weight'] > 0 else 0
-            
-            task_performance[task_type]['score_obtained'] += obtained_score
-            task_performance[task_type]['score_total'] += max_score
-        
-        # Calculate accuracies
-        task_accuracies = {}
-        for task_type in task_performance:
-            if task_performance[task_type]['score_total'] > 0:
-                accuracy = task_performance[task_type]['score_obtained'] / task_performance[task_type]['score_total']
-                task_accuracies[task_type] = accuracy
-            else:
-                task_accuracies[task_type] = 0.0
-        
-        # Store results
-        normal_results.append({
-            'test_type': test_type, 
-            'task_accuracies': task_accuracies
-        })
-    
+        if eval_results:
+            # Calculate scores
+            task_performance = {}
+            for result in eval_results:
+                task_type = result.get('task', 'unknown_task')
+                if task_type not in task_performance:
+                    task_performance[task_type] = {"score_obtained": 0, "score_total": 0}
+
+                obtained_score = 0
+                max_score = 0
+
+                for turn in result['conversations']:
+                    if turn['role'] == 'assistant':
+                        for criteria in turn['criteria']:
+                            if criteria['criteria_met'] and not criteria['is_penalty']:
+                                obtained_score += criteria['weight']
+                            max_score += criteria['weight'] if criteria['weight'] > 0 else 0
+
+                task_performance[task_type]['score_obtained'] += obtained_score
+                task_performance[task_type]['score_total'] += max_score
+
+            # Calculate accuracies
+            for task_type in task_performance:
+                if task_performance[task_type]['score_total'] > 0:
+                    accuracy = task_performance[task_type]['score_obtained'] / task_performance[task_type]['score_total']
+                    all_task_accuracies[task_type] = accuracy
+                else:
+                    all_task_accuracies[task_type] = 0.0
+
     # Append consolidated results
-    with open(score_file, 'a') as f:
-        f.write(f"Model: {model_name}\n")
-        f.write(f"Execution Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        
-        # Normal results section
-        if normal_results:
-            f.write("Video Benchmark Task Results:\n")
-            f.write("                    Task  Accuracy Accuracy (%)\n")
-            
-            # Collect all task accuracies and calculate overall
+    with open(score_file, 'w') as f:
+        f.write("=" * 60 + "\n")
+        f.write(f"  LongShOT Bench Evaluation Results\n")
+        f.write("=" * 60 + "\n\n")
+        f.write(f"  Model:  {model_name}\n")
+        f.write(f"  Date:   {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+        if all_task_accuracies:
             all_accuracies = []
-            task_index = 0
-            for result in normal_results:
-                for task, accuracy in result['task_accuracies'].items():
-                    f.write(f"{task_index:2d}  {task:>20}  {accuracy:.6f}       {accuracy*100:5.2f}%\n")
-                    all_accuracies.append(accuracy)
-                    task_index += 1
-            
-            # Calculate and write overall accuracy
-            if all_accuracies:
-                overall_accuracy = sum(all_accuracies) / len(all_accuracies)
-                f.write(f"{task_index:2d}  {'Overall':>20}  {overall_accuracy:.6f}       {overall_accuracy*100:5.2f}%\n\n")
+            category_accuracies = {}
+
+            for category, tasks in TASK_CATEGORIES.items():
+                f.write("-" * 60 + "\n")
+                f.write(f"  {category}\n")
+                f.write("-" * 60 + "\n")
+
+                cat_accuracies = []
+                for task in tasks:
+                    if task in all_task_accuracies:
+                        accuracy = all_task_accuracies[task]
+                        f.write(f"    {task:<30} {accuracy*100:6.2f}%\n")
+                        all_accuracies.append(accuracy)
+                        cat_accuracies.append(accuracy)
+
+                # Category average
+                if cat_accuracies:
+                    cat_avg = sum(cat_accuracies) / len(cat_accuracies)
+                    category_accuracies[category] = cat_avg
+                    f.write(f"    {'Category Average':<30} {cat_avg*100:6.2f}%\n")
+                f.write("\n")
+
+            # Overall summary (average of category averages)
+            if category_accuracies:
+                overall_accuracy = sum(category_accuracies.values()) / len(category_accuracies)
+                f.write("=" * 60 + "\n")
+                f.write(f"  OVERALL ACCURACY: {overall_accuracy*100:6.2f}%\n")
+                f.write("=" * 60 + "\n")
     
-    # Display results  
-    print("\n" + "="*50)
-    if normal_results:
-        print("Video Benchmark Task Results:")
-        print("                    Task  Accuracy Accuracy (%)")
-        
-        # Collect all task accuracies and calculate overall
-        all_accuracies = []
-        task_index = 0
-        for result in normal_results:
-            for task, accuracy in result['task_accuracies'].items():
-                print(f"{task_index:2d}  {task:>20}  {accuracy:.6f}       {accuracy*100:5.2f}%")
-                all_accuracies.append(accuracy)
-                task_index += 1
-        
-        # Calculate and display overall accuracy
-        if all_accuracies:
-            overall_accuracy = sum(all_accuracies) / len(all_accuracies)
-            print(f"{task_index:2d}  {'Overall':>20}  {overall_accuracy:.6f}       {overall_accuracy*100:5.2f}%")
-    
-    print("="*50)
+    # Display results
+    print("\n" + "=" * 60)
+    print("  LongShOT Bench Evaluation Results")
+    print("=" * 60 + "\n")
+
+    if all_task_accuracies:
+        category_accuracies_display = {}
+
+        for category, tasks in TASK_CATEGORIES.items():
+            print("-" * 60)
+            print(f"  {category}")
+            print("-" * 60)
+
+            cat_accuracies = []
+            for task in tasks:
+                if task in all_task_accuracies:
+                    accuracy = all_task_accuracies[task]
+                    print(f"    {task:<30} {accuracy*100:6.2f}%")
+                    cat_accuracies.append(accuracy)
+
+            if cat_accuracies:
+                cat_avg = sum(cat_accuracies) / len(cat_accuracies)
+                category_accuracies_display[category] = cat_avg
+                print(f"    {'Category Average':<30} {cat_avg*100:6.2f}%")
+            print()
+
+        # Overall (average of category averages)
+        if category_accuracies_display:
+            overall_accuracy = sum(category_accuracies_display.values()) / len(category_accuracies_display)
+            print("=" * 60)
+            print(f"  OVERALL ACCURACY: {overall_accuracy*100:6.2f}%")
+            print("=" * 60)
 
     scoring_end_time = time.time()
     scoring_duration = scoring_end_time - scoring_start_time

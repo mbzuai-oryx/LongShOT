@@ -9,8 +9,8 @@ export OMP_NUM_THREADS=5
 export VLLM_USE_TRITON_FLASH_ATTN=0
 
 TASK_NAME=postvalid_v1
-OUTPUT_DIR=results_postvalid_final/results_postvalid
-NUM_WORKERS=1024
+OUTPUT_DIR=results_postvalid
+NUM_WORKERS=8
 TENSORS=4
 
 # Accept parameter for number of models to run (default: all)

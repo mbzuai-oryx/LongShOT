@@ -7,7 +7,7 @@
 # - GPU 1,2,3: vLLM shards with high utilization
 # - Total: 4-way tensor parallelism across all GPUs
 
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
+# export CUDA_VISIBLE_DEVICES="0,1,2,3"
 export VLLM_USE_V1=1
 
 echo "Starting vLLM server on all available GPUs... "
@@ -20,23 +20,19 @@ export VLLM_MARLIN_USE_ATOMIC_ADD=1
 export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
 
 MODEL_NAME="Qwen/Qwen3-14B"
-MODEL_NAME="Qwen/Qwen2.5-VL-7B-Instruct"
 
 python -m vllm.entrypoints.openai.api_server \
   --model "$MODEL_NAME" \
-  --tensor-parallel-size 4 \
+  --tensor-parallel-size 8 \
   --gpu-memory-utilization 0.95 \
-  --max-num-seqs 2048 \
+  --max-num-seqs 64 \
   --max-model-len 90000 \
   --enable-chunked-prefill \
   --max-num-batched-tokens 131072 \
-  --task generate \
-  --enforce-eager \
   --disable-log-stats \
   --enable-prefix-caching \
   --served-model-name "$MODEL_NAME" \
   --trust-remote-code \
   --allowed-local-media-path "/" \
-  --limit-mm-per-prompt '{"image":0}' \
   --port 8002
 

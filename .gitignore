@@ -10,3 +10,5 @@ eval/results_*
 preprocess/MODELS/*
 note.txt
 .claude
+*.parquet
+*.ipynb

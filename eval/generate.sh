@@ -10,15 +10,15 @@ export VLLM_USE_TRITON_FLASH_ATTN=0
 
 TASK_NAME=postvalid_v1
 OUTPUT_DIR=results_postvalid
-NUM_WORKERS=1
+NUM_WORKERS=8
 
 # Accept parameter for number of models to run (default: all)
 NUM_MODELS=${1:-}
 
 MODELS=(
-# "Qwen/Qwen2_5_Omni_7B"
+# "Qwen/Qwen2_5_Omni_7B:4"
 # "Qwen/Qwen2.5-VL-7B-Instruct:4"
-"Qwen/Qwen3-VL-8B-Instruct":4
+"Qwen/Qwen3-VL-8B-Instruct:8"
 )
 
 # Limit models if parameter provided

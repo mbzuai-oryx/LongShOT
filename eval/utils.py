@@ -152,7 +152,6 @@ def generate_candidate_response(sample, model_name, config=None):
                     # Handle user turns for non-video-agent models
                     if i == 0:
                         # First user turn: validate video and include video reference
-                        print(video_path)
                         if not video_path or not os.path.exists(video_path):
                             raise FileNotFoundError(f"Video file not found: {video_path}")
 

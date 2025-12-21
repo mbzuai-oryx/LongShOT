@@ -93,32 +93,14 @@ def main():
 
     os.makedirs(os.path.join(args.output_dir, model_name_underscored), exist_ok=True)
     
-    def get_file_paths(test_type=""):
-        """Get output and eval file paths for a given test type"""
-        suffix = f"_hal_{test_type}" if test_type else ""
-        output = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}{suffix}.jsonl")
-        eval_path = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}{suffix}_eval.jsonl")
+    def get_file_paths():
+        """Get output and eval file paths"""
+        output = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}.jsonl")
+        eval_path = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}_eval.jsonl")
         return output, eval_path
-    
-    # Determine which tests to run - separate normal
-    normal_tests = []
-    
-    # Always include normal tests when generate is enabled or when evaluating/scoring existing results
-    if args.generate or args.evaluate or args.score:
-        normal_tests = [""]
-    
-    # Combine for compatibility with existing code
-    test_types = normal_tests
-    
-    timing_file = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}_timing.json")
-    
-    print(f"Running {len(test_types)} test(s): {test_types}")
-    for test_type in test_types:
-        output_file, eval_file = get_file_paths(test_type)
-        print(f"Results for {test_type or 'normal'} will be saved to: {output_file}")
 
-    # Print selected tasks
-    print(f"Selected tasks: {tasks_to_load}")
+    timing_file = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}_timing.json")
+    output_file, eval_file = get_file_paths()
 
     candidate_server = False
     eval_server = False
@@ -151,39 +133,32 @@ def main():
             candidate_server, candidate_log_file = start_vllm(model_name, args.tensor_parallel_size, "candidate", config)
         server_setup_time = time.time() - server_start_time
         
-        # Process normal tests
+        # Process samples
         inference_start_time = time.time()
-        
-        # First process normal tests
-        for test_type in normal_tests:
-            output_file, _ = get_file_paths(test_type)
-            
-            # Load already processed samples for this test type
-            completed_ids = set()
-            if os.path.exists(output_file):
-                with open(output_file, 'r') as f:
-                    for line in f:
-                        data = json.loads(line)
-                        completed_ids.add(data.get("sample_id"))
-            
-            # Filter samples for this test type
-            current_samples = [s for s in test_samples if s.get("sample_id") not in completed_ids]
-            if not current_samples:
-                continue
-                
-            print(f"Processing {len(current_samples)} samples for {test_type or 'normal'} test...")
-            
+
+        # Load already processed samples
+        completed_ids = set()
+        if os.path.exists(output_file):
+            with open(output_file, 'r') as f:
+                for line in f:
+                    data = json.loads(line)
+                    completed_ids.add(data.get("sample_id"))
+
+        # Filter samples
+        current_samples = [s for s in test_samples if s.get("sample_id") not in completed_ids]
+
+        if current_samples:
             if args.num_workers <= 1:
-                for sample in tqdm(current_samples, desc=f"{test_type or 'normal'} test"):
+                for sample in tqdm(current_samples, desc="Generating"):
                     process_sample(sample, output_file, model_name, config, tool_mode=args.tool)
             else:
                 from functools import partial
                 worker_func = partial(process_sample, output_file=output_file, model_name=model_name, config=config, tool_mode=args.tool)
                 with concurrent.futures.ProcessPoolExecutor(max_workers=args.num_workers) as executor:
                     futures = [executor.submit(worker_func, sample) for sample in current_samples]
-                    for _ in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"{test_type or 'normal'} test"):
+                    for _ in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Generating"):
                         pass
-               
+
         inference_end_time = time.time()
 
         # Clean up server
@@ -216,21 +191,18 @@ def main():
         
         # Check if there are any samples to evaluate before starting server
         has_samples_to_evaluate = False
-        for test_type in normal_tests:
-            output_file, eval_file = get_file_paths(test_type)
-            if os.path.exists(output_file):
-                responses = load_jsonl(output_file)
-                evaluated_ids = set()
-                if os.path.exists(eval_file):
-                    with open(eval_file, 'r') as f:
-                        for line in f:
-                            if line.strip():
-                                data = json.loads(line)
-                                evaluated_ids.add(data.get("sample_id"))
-                remaining = [sample for sample in responses if sample.get("sample_id") not in evaluated_ids]
-                if remaining:
-                    has_samples_to_evaluate = True
-                    break
+        if os.path.exists(output_file):
+            responses = load_jsonl(output_file)
+            evaluated_ids = set()
+            if os.path.exists(eval_file):
+                with open(eval_file, 'r') as f:
+                    for line in f:
+                        if line.strip():
+                            data = json.loads(line)
+                            evaluated_ids.add(data.get("sample_id"))
+            remaining = [sample for sample in responses if sample.get("sample_id") not in evaluated_ids]
+            if remaining:
+                has_samples_to_evaluate = True
         
         if not has_samples_to_evaluate:
             print("All samples already evaluated, skipping evaluation phase.")
@@ -241,21 +213,13 @@ def main():
         else:
             eval_server_setup_time = time.time() - eval_server_start_time
 
-        # Process normal tests
+        # Process evaluation
         eval_inference_start_time = time.time()
         total_evaluated = 0
-        
-        # First process normal test evaluations
-        for test_type in normal_tests:
-            output_file, eval_file = get_file_paths(test_type)
-            
-            if not os.path.exists(output_file):
-                print(f"Warning: Output file {output_file} not found, skipping evaluation for {test_type or 'normal'}")
-                continue
-                
+
+        if os.path.exists(output_file):
             responses = load_jsonl(output_file)
-            print(f"Evaluating {test_type or 'normal'} using model: {eval_model}")
-            
+
             # Load already evaluated samples
             evaluated_ids = set()
             if os.path.exists(eval_file):
@@ -264,28 +228,25 @@ def main():
                         if line.strip():
                             data = json.loads(line)
                             evaluated_ids.add(data.get("sample_id"))
-            
+
             # Filter samples
             responses = [sample for sample in responses if sample.get("sample_id") not in evaluated_ids]
-            if not responses:
-                continue
-                
-            print(f"Evaluating {len(responses)} {test_type or 'normal'} responses...")
-            total_evaluated += len(responses)
-            
-            if args.num_workers <= 1:
-                for sample in tqdm(responses, desc=f"Evaluating {test_type or 'normal'}"):
-                    process_video_evaluation(sample, eval_file, eval_model, config)
-            else:
-                from functools import partial
-                eval_worker_func = partial(process_video_evaluation, eval_file=eval_file, eval_model=eval_model, config=config)
-                with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
-                    futures = [executor.submit(eval_worker_func, sample) for sample in responses]
-                    for f in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"Evaluating {test_type or 'normal'}"):
-                        f.result()
-                        
+
+            if responses:
+                total_evaluated = len(responses)
+
+                if args.num_workers <= 1:
+                    for sample in tqdm(responses, desc="Evaluating"):
+                        process_video_evaluation(sample, eval_file, eval_model, config)
+                else:
+                    from functools import partial
+                    eval_worker_func = partial(process_video_evaluation, eval_file=eval_file, eval_model=eval_model, config=config)
+                    with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
+                        futures = [executor.submit(eval_worker_func, sample) for sample in responses]
+                        for f in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Evaluating"):
+                            f.result()
+
         eval_inference_end_time = time.time()
-        print("\nEvaluation completed...")
 
         # Clean up server
         eval_cleanup_start_time = time.time()
@@ -307,8 +268,8 @@ def main():
 
     if args.score:
         timing_results = calculate_and_save_scores(
-            args, model_name, model_name_underscored, test_types, tasks_to_load, 
-            timing_results, overall_start_time, get_file_paths
+            args, model_name, model_name_underscored, tasks_to_load,
+            timing_results, overall_start_time, eval_file
         )
     
     # Final timing save for runs that don't include scoring
