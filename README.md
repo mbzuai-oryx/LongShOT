@@ -160,3 +160,25 @@ bash eval.sh
 
 Results will be saved in the `eval/results_postvalid/` directory.
 
+## Acknowledgements
+
+<!-- We would like to thank Hafsa Hanan, cailinghan, Dian Jin and Xu Liu for their contribution in validations and verification of the data samples. -->
+
+This work is partially supported by the Meta Regional Research Grant, Project OMER, the Google Gift Research Award, and the NVIDIA Academic Grant.
+
+## Citation
+
+If you find this work useful, please cite our paper:
+
+```bibtex
+@misc{kurpath2025benchmarkagenticframeworkomnimodal,
+      title={A Benchmark and Agentic Framework for Omni-Modal Reasoning and Tool Use in Long Videos}, 
+      author={Mohammed Irfan Kurpath and Jaseel Muhammad Kaithakkodan and Jinxing Zhou and Sahal Shaji Mullappilly and Mohammad Almansoori and Noor Ahsan and Beknur Kalmakhanbet and Sambal Shikhar and Rishabh Lalla and Jean Lahoud and Mariette Awad and Fahad Shahbaz Khan and Salman Khan and Rao Muhammad Anwer and Hisham Cholakkal},
+      year={2025},
+      eprint={2512.16978},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2512.16978}, 
+}
+```
+
