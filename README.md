@@ -28,6 +28,8 @@
 - [Evaluation](#evaluation)
   - [Generate Model Responses](#generate-model-responses)
   - [Evaluate Responses](#evaluate-responses)
+- [Acknowledgements](#acknowledgements)
+- [Citation](#citation)
 
 ## Overview
 
