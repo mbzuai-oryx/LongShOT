@@ -1,0 +1,4 @@
+*.pdf
+eval/
+preprocess/
+datagen/
