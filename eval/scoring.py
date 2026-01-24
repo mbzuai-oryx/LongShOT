@@ -26,9 +26,13 @@ TASK_CATEGORIES = {
     "Multimodal Tasks": [
         "multimodal_synthesis",
         "cross_modal_verification",
-        "audio_visual_alignment",
-        "motion_analysis"
+        "audio_visual_alignment"
     ]
+}
+
+# Task remapping: merge source tasks into target tasks
+TASK_REMAP = {
+    "motion_analysis": "compositional_reasoning"
 }
 
 # Flat ordered list of all tasks
@@ -56,6 +60,7 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, tasks_to
     timing_file = os.path.join(args.output_dir, model_name_underscored, f"{model_name_underscored}_timing.json")
 
     all_task_accuracies = {}
+    task_counts = {}
 
     if not os.path.exists(eval_file):
         print(f"Warning: Evaluation file not found: {eval_file}")
@@ -66,8 +71,9 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, tasks_to
             task_performance = {}
             for result in eval_results:
                 task_type = result.get('task', 'unknown_task')
+                task_type = TASK_REMAP.get(task_type, task_type)
                 if task_type not in task_performance:
-                    task_performance[task_type] = {"score_obtained": 0, "score_total": 0}
+                    task_performance[task_type] = {"score_obtained": 0, "score_total": 0, "count": 0}
 
                 obtained_score = 0
                 max_score = 0
@@ -81,9 +87,12 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, tasks_to
 
                 task_performance[task_type]['score_obtained'] += obtained_score
                 task_performance[task_type]['score_total'] += max_score
+                task_performance[task_type]['count'] += 1
 
-            # Calculate accuracies
+            # Calculate accuracies and collect counts
+            task_counts = {}
             for task_type in task_performance:
+                task_counts[task_type] = task_performance[task_type]['count']
                 if task_performance[task_type]['score_total'] > 0:
                     accuracy = task_performance[task_type]['score_obtained'] / task_performance[task_type]['score_total']
                     all_task_accuracies[task_type] = accuracy
@@ -101,6 +110,7 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, tasks_to
         if all_task_accuracies:
             all_accuracies = []
             category_accuracies = {}
+            total_samples = 0
 
             for category, tasks in TASK_CATEGORIES.items():
                 f.write("-" * 60 + "\n")
@@ -108,25 +118,29 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, tasks_to
                 f.write("-" * 60 + "\n")
 
                 cat_accuracies = []
+                cat_count = 0
                 for task in tasks:
                     if task in all_task_accuracies:
                         accuracy = all_task_accuracies[task]
-                        f.write(f"    {task:<30} {accuracy*100:6.2f}%\n")
+                        count = task_counts.get(task, 0)
+                        f.write(f"    {task:<30} {count:>4}  {accuracy*100:6.2f}%\n")
                         all_accuracies.append(accuracy)
                         cat_accuracies.append(accuracy)
+                        cat_count += count
 
                 # Category average
                 if cat_accuracies:
                     cat_avg = sum(cat_accuracies) / len(cat_accuracies)
                     category_accuracies[category] = cat_avg
-                    f.write(f"    {'Category Average':<30} {cat_avg*100:6.2f}%\n")
+                    total_samples += cat_count
+                    f.write(f"    {'Category Average':<30} {cat_count:>4}  {cat_avg*100:6.2f}%\n")
                 f.write("\n")
 
             # Overall summary (average of category averages)
             if category_accuracies:
                 overall_accuracy = sum(category_accuracies.values()) / len(category_accuracies)
                 f.write("=" * 60 + "\n")
-                f.write(f"  OVERALL ACCURACY: {overall_accuracy*100:6.2f}%\n")
+                f.write(f"  OVERALL ACCURACY:             {total_samples:>4}  {overall_accuracy*100:6.2f}%\n")
                 f.write("=" * 60 + "\n")
     
     # Display results
@@ -136,6 +150,7 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, tasks_to
 
     if all_task_accuracies:
         category_accuracies_display = {}
+        total_samples_display = 0
 
         for category, tasks in TASK_CATEGORIES.items():
             print("-" * 60)
@@ -143,23 +158,27 @@ def calculate_and_save_scores(args, model_name, model_name_underscored, tasks_to
             print("-" * 60)
 
             cat_accuracies = []
+            cat_count = 0
             for task in tasks:
                 if task in all_task_accuracies:
                     accuracy = all_task_accuracies[task]
-                    print(f"    {task:<30} {accuracy*100:6.2f}%")
+                    count = task_counts.get(task, 0)
+                    print(f"    {task:<30} {count:>4}  {accuracy*100:6.2f}%")
                     cat_accuracies.append(accuracy)
+                    cat_count += count
 
             if cat_accuracies:
                 cat_avg = sum(cat_accuracies) / len(cat_accuracies)
                 category_accuracies_display[category] = cat_avg
-                print(f"    {'Category Average':<30} {cat_avg*100:6.2f}%")
+                total_samples_display += cat_count
+                print(f"    {'Category Average':<30} {cat_count:>4}  {cat_avg*100:6.2f}%")
             print()
 
         # Overall (average of category averages)
         if category_accuracies_display:
             overall_accuracy = sum(category_accuracies_display.values()) / len(category_accuracies_display)
             print("=" * 60)
-            print(f"  OVERALL ACCURACY: {overall_accuracy*100:6.2f}%")
+            print(f"  OVERALL ACCURACY:             {total_samples_display:>4}  {overall_accuracy*100:6.2f}%")
             print("=" * 60)
 
     scoring_end_time = time.time()

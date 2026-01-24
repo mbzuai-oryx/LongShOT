@@ -32,7 +32,7 @@ vllm_candidate:
 # vLLM Server Configuration for Evaluation Model  
 vllm_evaluation:
   max_model_len: "32768"
-  max_num_seqs: "256"
+  max_num_seqs: "512"
   trust_remote_code: true
   # allowed_local_media_path: "/"
   enable_prefix_caching: true
@@ -44,7 +44,7 @@ vllm_evaluation:
 paths:
   logs_dir: "logs"
   # video_path: "../preprocess/dataset/videos"
-  video_path: "/data1/video_benchmark/validation_tool/dataset/videos"
+  video_path: "/opt/dlami/nvme/home/Sahal.Mullappilly@mbzuai.ac.ae/longshot_rebuttal/REBUTTAL/videos"
 
 # System Configuration
 system:

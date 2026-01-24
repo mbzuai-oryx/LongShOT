@@ -691,7 +691,13 @@ Instructions:
                 "temperature": config['evaluation']['temperature'],
                 "max_tokens": config['evaluation']['max_tokens'],
                 "top_p": config['evaluation']['top_p'],
-                "guided_json": json_schema
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "criteria_evaluation",
+                        "schema": json_schema
+                    }
+                }
             }
 
             response = requests.post(

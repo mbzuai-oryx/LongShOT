@@ -12,3 +12,4 @@ note.txt
 .claude
 *.parquet
 *.ipynb
+agent/

@@ -3,6 +3,8 @@
 # Usage: ./generate.sh [num_models]
 # If num_models is not provided, all models will be processed
 
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+
 export HF_HUB_READ_TIMEOUT=600
 export HF_HUB_CONNECTION_TIMEOUT=1200
 export OMP_NUM_THREADS=5
@@ -10,7 +12,7 @@ export VLLM_USE_TRITON_FLASH_ATTN=0
 
 TASK_NAME=postvalid_v1
 OUTPUT_DIR=results_postvalid
-NUM_WORKERS=8
+NUM_WORKERS=512
 
 # Accept parameter for number of models to run (default: all)
 NUM_MODELS=${1:-}
@@ -18,7 +20,9 @@ NUM_MODELS=${1:-}
 MODELS=(
 # "Qwen/Qwen2_5_Omni_7B:4"
 # "Qwen/Qwen2.5-VL-7B-Instruct:4"
-"Qwen/Qwen3-VL-8B-Instruct:8"
+# "Qwen/Qwen3-VL-8B-Instruct:8"
+# "zai-org/GLM-4.6V-Flash:4"
+"video-agent:1"
 )
 
 # Limit models if parameter provided
