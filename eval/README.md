@@ -24,7 +24,6 @@ eval.py          # Main evaluation script
 
 utils.py         # Core utilities (dataset loading, API calls, server management)
 scoring.py       # Score calculation and aggregation
-tool_handler.py  # Tool calling functionality for agentic evaluation
 ```
 
 ## Prerequisites
@@ -35,7 +34,7 @@ tool_handler.py  # Tool calling functionality for agentic evaluation
    ```
 3. **Dataset Access**: The framework loads datasets from Hugging Face. Ensure you have:
    - Hugging Face authentication configured
-   - Access to the required datasets (MBZUAI/longshot-bench)
+   - Access to the required datasets (anonymous/longshot-bench)
 
 4. **Video Files**: Videos must be available at the path specified in configuration:
    ```yaml
@@ -98,7 +97,7 @@ system:
 ```yaml
 longshot_bench:
   postvalid_v1:
-    path: MBZUAI/longshot-bench
+    path: anonymous/longshot-bench
     name: postvalid_v1
     split: test
 ```

@@ -15,7 +15,7 @@ generation:
 
 # Evaluation Parameters
 evaluation:
-  max_tokens: 4096
+  max_tokens: 4096 
   temperature: 0.1
   top_p: 1.0
   timeout: 60  # seconds
@@ -23,28 +23,63 @@ evaluation:
 # vLLM Server Configuration for Candidate Model
 vllm_candidate:
   max_model_len: ""
-  max_num_seqs: "1024"
+  max_num_seqs: "256"
   trust_remote_code: true
   allowed_local_media_path: "/"
   enable_prefix_caching: true
-  additional_args: []  # Add any additional vllm arguments here
+  additional_args: [
+    # "--data-parallel-size", "2",
+    # "--mm-encoder-tp-mode", "data",
+    "--gpu-memory-utilization", "0.9",
+    "--mm-processor-cache-gb", "64",
+    "--long-prefill-token-threshold", "8192",
+    "--max-long-partial-prefills", "1",
+    "--async-scheduling",
+    "--compilation-config", '{"mode": "VLLM_COMPILE"}',
+    "--max-num-batched-tokens", "65536",
+    "--performance-mode", "throughput",
+    "--enable-chunked-prefill",
+    "--no-disable-cascade-attn",
+    "--prefix-caching-hash-algo", "xxhash",
+    "--media-io-kwargs", '{"video": {"backend": "pyav"}}'
+  ]
 
-# vLLM Server Configuration for Evaluation Model  
+# vLLM Server Configuration for Evaluation Model (text-only, no multimodal args)
 vllm_evaluation:
   max_model_len: "32768"
   max_num_seqs: "512"
   trust_remote_code: true
-  # allowed_local_media_path: "/"
   enable_prefix_caching: true
-  # additional_args: [
-  #   "--limit-mm-per-prompt" , "{'image':0, 'video' : 0}"
-  # ]  # Add any additional vllm arguments here
+  additional_args: [
+    "--gpu-memory-utilization", "0.9",
+    "--async-scheduling",
+    "--compilation-config", '{"mode": "VLLM_COMPILE"}'
+  ]
+
+# OpenRouter API Configuration (for cloud-hosted models via :api flag)
+openrouter:
+  # api_key: "sk-or-..."  # Or set OPENROUTER_API_KEY env var
+  max_connections: 8       # Concurrent requests (keep low to avoid rate limits / save money)
+  timeout: 1800            # Request timeout in seconds
+  max_tokens: 8192         # Override generation max_tokens for API models
+  max_retries: 3           # Retries on 429/5xx errors with exponential backoff
+  retry_delay: 2.0         # Base delay between retries (doubles each attempt)
+  cost_log: "openrouter_costs.jsonl"  # Token usage log for cost tracking
+  # provider:              # Optional: route to specific providers
+  #   order: ["Fireworks"]
+  #   allow_fallbacks: true
+
+# OpenAI API Configuration (for openai_bench.py)
+openai:
+  # api_key set via OPENAI_API_KEY env var
+  max_tokens: 4096         # Generation max tokens
+  eval_max_tokens: 64     # With reasoning_effort=minimal, output is ~20 tokens (just JSON boolean)
+  detail: "low"            # Image detail: "low" (85 tok/img) or "high" (170/tile+85)
 
 # Paths Configuration
 paths:
   logs_dir: "logs"
-  # video_path: "../preprocess/dataset/videos"
-  video_path: "/opt/dlami/nvme/home/Sahal.Mullappilly@mbzuai.ac.ae/longshot_rebuttal/REBUTTAL/videos"
+  video_path: "./data/videos"
 
 # System Configuration
 system:

@@ -49,5 +49,4 @@ test_audio_variations/
 # preprocessing cache
 preprocessing*/
 
-.claude/
 audio_segments/

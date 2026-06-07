@@ -517,7 +517,7 @@ After generating the dataset:
 ```python
 from datasets import Dataset
 dataset = Dataset.from_json("results/clean_dataset.jsonl")
-dataset.push_to_hub("your-org/longshot-bench", config_name="postvalid")
+dataset.push_to_hub("anonymous/longshot-bench", config_name="postvalid")
 ```
 
 2. **Run Evaluation** (see `../eval/README.md`):

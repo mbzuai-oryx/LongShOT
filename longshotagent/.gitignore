@@ -1,0 +1,239 @@
+
+# ==============================================
+*~
+._*
+*$py.class
+*.3g2
+*.3gp
+*.aac
+# Audio files
+*.avi
+*.backup
+# Backup files
+*.bak
+batch_processing_report.json
+*.bin
+*.bmp
+build/
+*.cache
+.cache
+.cache/
+cache/
+# Cache directory (processed video data)
+celerybeat.pid
+celerybeat-schedule
+# Celery stuff
+.chroma/
+chroma_db/
+# ChromaDB specific
+# Configuration files with secrets
+config.yaml
+core.*
+# Core dumps
+*.cover
+cover/
+.coverage
+.coverage.*
+coverage.xml
+*.cubin
+# CUDA/GPU specific
+cython_debug/
+# Cython debug symbols
+data/
+datasets/
+*.db
+db.sqlite3
+db.sqlite3-journal
+develop-eggs/
+dist/
+# Django stuff:
+*.dmp
+.dmypy.json
+dmypy.json
+docs/_build/
+docs/build/
+# Documentation build
+downloads/
+.DS_Store
+.DS_Store?
+*.egg
+*.egg-info/
+.eggs/
+eggs/
+ehthumbs.db
+embeddings/
+# Embeddings and features
+.env
+env/
+ENV/
+env.bak/
+# Environments
+.env.local
+.env.production
+# Eval results
+evals/results/
+faster_whisper_cache/
+# Faster Whisper cache
+features/
+ffmpeg2pass-*.log
+# FFmpeg temporary files
+*.flac
+# Flask stuff:
+*.flv
+*.gif
+htmlcov/
+.huggingface/
+# Hugging Face cache
+.hypothesis/
+*.ico
+.idea/
+# IDE files
+# Image files (large datasets)
+.installed.cfg
+# Installer logs
+instance/
+*.ipynb_checkpoints/
+.ipynb_checkpoints
+# IPython
+ipython_config.py
+*.jpeg
+*.jpg
+# Jupyter
+# Jupyter Notebook
+# Large data directories
+lib/
+lib64/
+local_config.py
+# Local configuration overrides
+local_settings.py
+*.log
+# Log files
+logs/
+*.m4a
+*.m4v
+*.manifest
+MANIFEST
+# Memory dumps
+# mkdocs documentation
+*.mkv
+*.mo
+*.model
+model_cache/
+# Model cache directories
+models/
+*.mov
+*.mp3
+*.mp4
+# mypy
+.mypy_cache/
+nosetests.xml
+.nox/
+*.npy
+*.npz
+*.ogg
+*.onnx
+open_clip_cache/
+# OpenCLIP cache
+# OS generated files
+parts/
+# pdm
+.pdm.toml
+# PEP 582
+# Performance profiling
+persist/
+*.pickle
+pip-delete-this-directory.txt
+# pipenv
+Pipfile.lock
+pip-log.txt
+*.pkl
+*.png
+# poetry
+poetry.lock
+*.pot
+preprocessing.log
+processed_data/
+*.prof
+*.profile
+profile_default/
+*.ptx
+.pybuilder/
+# PyBuilder
+__pycache__/
+# PyCharm
+*.py[cod]
+*.py,cover
+# pyenv
+# PyInstaller
+__pypackages__/
+.pyre/
+# Pyre type checker
+.pytest_cache/
+# Python
+.Python
+.python-version
+.pytype/
+# pytype static type analyzer
+qdrant_db/
+qdrant_storage/
+raw_data/
+results*/
+.ropeproject
+# Rope project settings
+*.safetensors
+# SageMath parsed files
+*.sage.py
+sample_videos/
+.scrapy
+# Scrapy stuff:
+sdist/
+secrets.json
+sentence_transformers_cache/
+# Sentence transformers cache
+share/python-wheels/
+/site
+*.so
+*.spec
+# Sphinx documentation
+.Spotlight-V100
+.spyderproject
+# Spyder project settings
+.spyproject
+*.sqlite
+*.svg
+*.swo
+*.swp
+target/
+*.temp
+temp/
+# Temporary files
+test_data/
+# Testing
+test_videos/
+Thumbs.db
+*.tif
+*.tiff
+*.tmp
+tmp/
+.tox/
+trace/
+transformers_cache/
+# Translations
+.Trashes
+# Unit test / coverage reports
+var/
+# Vector database
+.venv
+venv/
+venv.bak/
+# Video files (too large for git)
+video_preprocessing.log
+# Video Preprocessing Specific
+.vscode/
+*.wav
+.webassets-cache
+*.webm
+*.webp
+wheels/
+*.wma
+*.wmv

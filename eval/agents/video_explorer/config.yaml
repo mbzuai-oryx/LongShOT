@@ -1,0 +1,62 @@
+# VideoExplorer Agent Configuration
+# Based on: https://github.com/RUC-NLPIR/VideoDeepResearch
+# Uses official fine-tuned models from HuggingFace
+
+repo:
+  path: repos/VideoDeepResearch  # Relative to agents/ directory
+
+# Official fine-tuned models from VideoExplorer authors
+models:
+  planner: avery00/VideoExplorer-Planner-7B
+  temporal_grounder: avery00/VideoExplorer-TemporalGrounder
+  vlm: Qwen/Qwen2-VL-7B-Instruct
+
+  # Retrieval models (loaded internally by VideoExplorer)
+  retriever: LanguageBind/LanguageBind_Video_FT
+  text_retriever: BAAI/bge-m3
+
+# Server configurations for vLLM deployment.
+# GPU topology (logical indices, relative to parent CUDA_VISIBLE_DEVICES in agents.sh):
+#   0 → retriever + embedding models (loaded in-process; see inference.retriever_gpu)
+#   1 → planner
+#   2 → temporal grounder
+#   3 → VLM
+servers:
+  planner:
+    gpu: 1
+    port: 8104
+    tensor_parallel: 1
+    gpu_memory_utilization: 0.85
+
+  temporal_grounder:
+    gpu: 2
+    port: 8103
+    tensor_parallel: 1
+    gpu_memory_utilization: 0.85
+
+  vlm:
+    gpu: 3
+    port: 8105
+    tensor_parallel: 1
+    gpu_memory_utilization: 0.85
+    limit_mm_per_prompt: '{"image": 32}'
+
+# Inference settings - using VideoExplorer defaults
+inference:
+  max_rounds: 20
+  use_subtitles: true
+  clip_duration: 10
+  max_frames: 32
+  # Concurrent samples processed by the agent loop. Each sample hits the 3
+  # vLLM servers multiple times; pick a value large enough to keep all three
+  # GPUs busy but small enough to avoid server-side queueing dominating.
+  agent_concurrency: 8
+  # Logical GPU index (relative to parent CUDA_VISIBLE_DEVICES) for the
+  # in-process LanguageBind retriever + BGE-M3 text embedder. Keep this
+  # distinct from every server GPU above.
+  retriever_gpu: 0
+
+paths:
+  # Preprocessed data directory (run preprocess.sh first)
+  data_dir: ./agents/video_explorer/data
+  cache_dir: ./agents/video_explorer/cache

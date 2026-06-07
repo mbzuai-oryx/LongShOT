@@ -1,0 +1,37 @@
+# Video-RAG Agent Configuration
+# Based on: https://github.com/Leon1207/Video-RAG-master
+# Training-free RAG pipeline. Models match upstream defaults — do not
+# substitute. Everything runs in-process (no vLLM); the `llava` package
+# from LLaVA-NeXT must be installed in the env.
+
+repo:
+  path: repos/Video-RAG-master  # Relative to agents/ directory
+
+# Upstream-pinned model identifiers. Do NOT change.
+models:
+  vlm: lmms-lab/LLaVA-Video-7B-Qwen2
+  asr: openai/whisper-large
+  clip: openai/clip-vit-large-patch14-336
+  text_embed: facebook/contriever
+
+# GPU layout. `vlm` may be an int (single VLM) or list (one VLM per id).
+# Duplicate ids to stack multiple copies on one GPU (LLaVA-Video-7B is
+# ~16GB in bf16; a 96GB card fits ~5 copies). Worker count is auto-derived
+# from len(vlm). `aux` is a single GPU shared by Whisper/CLIP/Contriever/OCR.
+gpus:
+  vlm: [0, 1, 2]
+  aux: 3
+
+inference:
+  max_frames: 32
+  fps: 1
+  rag_threshold: 0.3
+  clip_threshold: 0.3
+  beta: 3.0
+  use_ocr: true
+  use_asr: true
+  use_det: false
+  max_new_tokens: 1024
+
+paths:
+  cache_dir: ./agents/video_rag/cache

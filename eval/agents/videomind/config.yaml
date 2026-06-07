@@ -1,0 +1,33 @@
+# VideoMind Agent Configuration
+# Based on: https://github.com/yeliudev/VideoMind
+# Chain-of-LoRA multi-agent: planner → grounder → verifier → answerer
+# All roles share a single Qwen2-VL base model with switchable LoRA adapters.
+# Runs entirely in-process (no vLLM servers).
+# Multi-GPU: one independent replica per GPU, pooled via queue.
+
+repo:
+  path: repos/VideoMind  # Relative to agents/ directory
+
+# Model checkpoints. The grounder path doubles as the base model loader.
+# All others are LoRA adapter directories loaded on top.
+# Use 7B for best quality; 2B for faster/lighter runs.
+models:
+  videomind: yeliudev/VideoMind-7B  # Contains grounder/, planner/, verifier/ adapters
+
+# GPU indices (relative to CUDA_VISIBLE_DEVICES) to load replicas on.
+# One model replica (~18GB) per GPU. Omit to auto-detect all visible GPUs.
+gpus: [0, 1, 2, 3]
+
+dtype: float16
+
+inference:
+  auto_planning: true
+  auto_rephrasing: true
+  use_verifier: true
+  min_answer_segment_len: 32  # Minimum segment length in seconds for answerer
+  max_new_tokens: 256         # Upstream default for all roles
+  # Answerer vision parameters (match upstream defaults)
+  answerer_min_pixels: 128   # multiplied by 28*28
+  answerer_max_pixels: 256   # multiplied by 28*28
+  answerer_max_frames: 32
+  answerer_fps: 2.0

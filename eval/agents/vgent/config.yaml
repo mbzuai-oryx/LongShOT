@@ -1,0 +1,37 @@
+# Vgent Agent Configuration
+# Based on: https://github.com/xiaoqian-shen/Vgent
+# Graph-based retrieval-reasoning-augmented generation for long video QA.
+# NeurIPS 2025 Spotlight.
+#
+# Two-phase pipeline:
+#   1. Offline: build per-video semantic graphs (entities/actions/scenes)
+#   2. Online:  retrieve → refine → aggregate → answer
+#
+# Runs entirely in-process (no vLLM servers). Multi-GPU via replica pooling.
+
+repo:
+  path: repos/Vgent
+
+models:
+  vlm: Qwen/Qwen2.5-VL-7B-Instruct
+  embedding: BAAI/bge-large-en-v1.5
+
+# GPU indices for VLM replicas. One replica (~20GB bf16) per GPU.
+# Embedding model co-located on same GPU. Omit to auto-detect all visible GPUs.
+gpus: [0]
+
+graph:
+  chunk_size: 64
+  fps: 1.0
+  n_retrieval: 20
+  n_refine: 5
+  total_pixels: 16384
+  uniform_frame: 450
+  cache_dir: ./agents/vgent/graphs
+
+inference:
+  max_new_tokens: 512
+  graph_max_new_tokens: 512
+  keyword_max_new_tokens: 256
+  refine_max_new_tokens: 256
+  answer_max_new_tokens: 512

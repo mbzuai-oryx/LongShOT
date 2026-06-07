@@ -1,0 +1,37 @@
+# Video Processing and AI Libraries
+faster-whisper>=0.9.0
+open-clip-torch>=2.20.0
+torch>=2.0.0
+torchvision>=0.15.0
+ffmpeg-python>=0.2.0
+
+# Vector Database
+chromadb>=0.4.0  # kept for one-shot migration read
+qdrant-client>=1.11.0
+
+# Data Processing
+numpy>=1.24.0
+pillow>=9.0.0
+tqdm>=4.65.0
+sentence-transformers>=2.2.0
+imagehash>=4.3.0
+
+# Server
+fastapi>=0.100.0
+uvicorn>=0.23.0
+
+# Utilities
+click>=8.0.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+openai>=1.68.0
+httpx>=0.27.0
+pyyaml>=6.0
+psutil>=5.9.0  # For memory monitoring in batch processing
+
+# Development and Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0

@@ -1,10 +1,5 @@
 longshot_bench:
-  postvalid_tools_v1:
-    path: MBZUAI/longshot-bench
-    name: postvalid_tools_v1
-    split: test
-
-  postvalid_v1:
-    path: MBZUAI/longshot-bench
-    name: postvalid_v1
+  postvalid_v2:
+    path: anonymous/longshot-bench
+    name: postvalid_v2
     split: test

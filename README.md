@@ -1,4 +1,4 @@
-# LongShOT: A Benchmark and Agentic Framework for Omni-Modal Reasoning and Tool Use in Long Videos
+# LongShOT: A Benchmark for Omni-Modal Reasoning in Long Videos
 
 <p align="center">
     <img src="https://i.imgur.com/waxVImv.png" alt="LongShOT">
@@ -12,6 +12,7 @@
 [![Website](https://img.shields.io/badge/Project-Website-87CEEB)](https://mbzuai-oryx.github.io/LongShOT/)
 [![Paper](https://img.shields.io/badge/arXiv-Paper-<COLOR>.svg)](https://arxiv.org/abs/2512.16978)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-Dataset-F9D371)](https://huggingface.co/datasets/MBZUAI/longshot-bench)
+[![Leaderboard](https://img.shields.io/badge/🏆-Leaderboard-FF6B6B)](https://longshot.cvmbzuai.com/leaderboard)
 [![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](https://github.com/mbzuai-oryx/BiMediX/blob/main/LICENSE.txt)
 
 ## Table of Contents
@@ -28,18 +29,25 @@
 - [Evaluation](#evaluation)
   - [Generate Model Responses](#generate-model-responses)
   - [Evaluate Responses](#evaluate-responses)
+- [LongShOTAgent](#longshotagent)
 - [Acknowledgements](#acknowledgements)
 - [Citation](#citation)
 
 ## Overview
 
-LongShOT introduces a diagnostic benchmark and agentic framework for long-form multimodal video understanding. **LongShOTBench** features open-ended questions, multi-turn dialogues, and tasks requiring vision, speech, and audio reasoning with tool use. Each sample includes reference answers and graded rubrics for interpretable evaluation. **LongShOTAgent** employs preprocessing, search, and iterative refinement to analyze long videos. Current state-of-the-art models show significant gaps: Gemini-2.5-Flash achieves 52.95%, open-source models remain below 30%, and LongShOTAgent attains 44.66%, highlighting the challenge of real-world long video understanding.
+LongShOT introduces a diagnostic benchmark for long-form omni-modal video understanding. **LongShOTBench** features 3,401 intent-driven single- and multi-turn questions over 274 long-form videos (~41 min avg, ~188 hours total), probing visual, speech, and ambient-audio reasoning. Each sample includes reference answers and weighted criterion-level rubrics for interpretable evaluation with partial credit. **LongShOTAgent** is a training-free agentic baseline that couples full-video preprocessing with targeted retrieval, segment refinement, and claim verification over visual, speech, and audio evidence. Comprehensive evaluation of 105+ models reveals significant performance gaps, with the strongest closed-source API (Gemini 3.1 Pro) reaching 55.63%, the best open-source model (Qwen3-Omni 30B) reaching 64.05%, and LongShOTAgent achieving 66.64%.
+
+<p align="center">
+    <img src="figures/longshot_at_a_glance.png" alt="LongShOTBench at a glance">
+</p>
+
+_**Figure 1:** LongShOTBench at a glance. An illustrated hour-long surprise party video shows how understanding a single scene requires fusing visual cues, speech, and non-speech audio scattered across temporally distant moments. LongShOTBench captures this challenge through intent-driven single- and multi-turn Q&A paired with weighted criterion-level rubrics, scored against a human-annotated ground truth._
 
 <p align="center">
     <img src="figures/generation_pipeline_overview.png" alt="Generation Pipeline">
 </p>
 
-_**Figure 1:** Construction pipeline of LongShOTBench. The pipeline begins with raw video data where speech, visuals, and audio cues are extracted. These are passed into multimodal processing to generate segment-wise aligned and fused metadata. Only the distilled information flows to question design, where scenarios and question types are mapped, followed by the generation of questions and conversational answers. Next, verifiable rubrics are created to evaluate correctness and difficulty. Finally, the core dataset, comprising Q&A pairs and tailored evaluation rubrics, is manually reviewed and corrected by human validators, ensuring a clean, reliable benchmark._
+_**Figure 2:** Construction pipeline of LongShOTBench. Starting from raw long-form videos, speech, visual, and audio cues are extracted and fused into segment-wise aligned omni-modal metadata. The distilled metadata drives scenario and task mapping, followed by single- and multi-turn Q&A generation and verifiable rubric construction. Human validators review and correct the Q&A pairs and tailored rubrics, ensuring a grounded and reliable benchmark._
 
 ## Installation
 
@@ -162,9 +170,11 @@ bash eval.sh
 
 Results will be saved in the `eval/results_postvalid/` directory.
 
-## Acknowledgements
+## LongShOTAgent
 
-<!-- We would like to thank Hafsa Hanan, cailinghan, Dian Jin and Xu Liu for their contribution in validations and verification of the data samples. -->
+LongShOTAgent is a training-free omni-modal evidence-seeking agent that serves as a reference baseline for LongShOTBench. It preprocesses a video into a searchable multimodal store and operates a ReAct-style search–refine–verify loop at query time. See `longshotagent/` for setup and usage instructions.
+
+## Acknowledgements
 
 This work is partially supported by the Meta Regional Research Grant, Project OMER, the Google Gift Research Award, and the NVIDIA Academic Grant.
 
@@ -183,4 +193,3 @@ If you find this work useful, please cite our paper:
       url={https://arxiv.org/abs/2512.16978}, 
 }
 ```
-
