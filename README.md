@@ -30,6 +30,7 @@
   - [Generate Model Responses](#generate-model-responses)
   - [Evaluate Responses](#evaluate-responses)
 - [LongShOTAgent](#longshotagent)
+- [Responsible Usage](#responsible-usage)
 - [Acknowledgements](#acknowledgements)
 - [Citation](#citation)
 
@@ -38,13 +39,13 @@
 LongShOT introduces a diagnostic benchmark for long-form omni-modal video understanding. **LongShOTBench** features 3,401 intent-driven single- and multi-turn questions over 274 long-form videos (~41 min avg, ~188 hours total), probing visual, speech, and ambient-audio reasoning. Each sample includes reference answers and weighted criterion-level rubrics for interpretable evaluation with partial credit. **LongShOTAgent** is a training-free agentic baseline that couples full-video preprocessing with targeted retrieval, segment refinement, and claim verification over visual, speech, and audio evidence. Comprehensive evaluation of 105+ models reveals significant performance gaps, with the strongest closed-source API (Gemini 3.1 Pro) reaching 55.63%, the best open-source model (Qwen3-Omni 30B) reaching 64.05%, and LongShOTAgent achieving 66.64%.
 
 <p align="center">
-    <img src="figures/longshot_at_a_glance.png" alt="LongShOTBench at a glance">
+    <img src="assets/longshot_hero.png" alt="LongShOTBench at a glance">
 </p>
 
 _**Figure 1:** LongShOTBench at a glance. An illustrated hour-long surprise party video shows how understanding a single scene requires fusing visual cues, speech, and non-speech audio scattered across temporally distant moments. LongShOTBench captures this challenge through intent-driven single- and multi-turn Q&A paired with weighted criterion-level rubrics, scored against a human-annotated ground truth._
 
 <p align="center">
-    <img src="figures/generation_pipeline_overview.png" alt="Generation Pipeline">
+    <img src="assets/generation_pipeline_overview.png" alt="Generation Pipeline">
 </p>
 
 _**Figure 2:** Construction pipeline of LongShOTBench. Starting from raw long-form videos, speech, visual, and audio cues are extracted and fused into segment-wise aligned omni-modal metadata. The distilled metadata drives scenario and task mapping, followed by single- and multi-turn Q&A generation and verifiable rubric construction. Human validators review and correct the Q&A pairs and tailored rubrics, ensuring a grounded and reliable benchmark._
@@ -174,6 +175,28 @@ Results will be saved in the `eval/results_postvalid/` directory.
 
 LongShOTAgent is a training-free omni-modal evidence-seeking agent that serves as a reference baseline for LongShOTBench. It preprocesses a video into a searchable multimodal store and operates a ReAct-style search–refine–verify loop at query time. See `longshotagent/` for setup and usage instructions.
 
+<p align="center">
+    <img src="assets/agent_architecture.png" alt="LongShOTAgent architecture">
+</p>
+
+_**Figure 3:** LongShOTAgent architecture. The indexer embeds video frames, speech transcripts and audio understanding into a per-video vector store. At query time, the orchestrator LLM analyzes multimodal evidence by issuing tool calls in a ReAct-style loop: `search_video` for semantic retrieval, `refine_video` for fine-grained segment-level re-analysis with specialists, and `verify_claim` for evidence grounding._
+
+### Walkthrough
+
+A short walkthrough of LongShOTAgent answering a query end-to-end — retrieving, refining, and verifying omni-modal evidence before producing a grounded answer.
+
+<p align="center">
+    <video src="https://github.com/mbzuai-oryx/LongShOT/raw/main/assets/longshot_agent_demo.mp4" controls muted width="80%"></video>
+</p>
+
+## Responsible Usage
+
+LongShOTAgent can make mistakes. Please keep the following in mind:
+
+- **Always validate responses against the source video.**
+- **Do not use for high-stakes decisions.**
+- **Research intent.** This benchmark, dataset, and agent are released for research and evaluation purposes. Respect the dataset license and the terms of any source content.
+
 ## Acknowledgements
 
 This work is partially supported by the Meta Regional Research Grant, Project OMER, the Google Gift Research Award, and the NVIDIA Academic Grant.
@@ -183,10 +206,10 @@ This work is partially supported by the Meta Regional Research Grant, Project OM
 If you find this work useful, please cite our paper:
 
 ```bibtex
-@misc{kurpath2025benchmarkagenticframeworkomnimodal,
-      title={A Benchmark and Agentic Framework for Omni-Modal Reasoning and Tool Use in Long Videos}, 
+@misc{kurpath2026benchmarkomnimodalreasoninglong,
+      title={A Benchmark for Omni-Modal Reasoning in Long Videos}, 
       author={Mohammed Irfan Kurpath and Jaseel Muhammad Kaithakkodan and Jinxing Zhou and Sahal Shaji Mullappilly and Mohammad Almansoori and Noor Ahsan and Beknur Kalmakhanbet and Sambal Shikhar and Rishabh Lalla and Jean Lahoud and Mariette Awad and Fahad Shahbaz Khan and Salman Khan and Rao Muhammad Anwer and Hisham Cholakkal},
-      year={2025},
+      year={2026},
       eprint={2512.16978},
       archivePrefix={arXiv},
       primaryClass={cs.CV},
