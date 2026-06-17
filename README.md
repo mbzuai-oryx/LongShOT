@@ -186,12 +186,10 @@ _**Figure 3:** LongShOTAgent architecture. The indexer embeds video frames, spee
 A short walkthrough of LongShOTAgent answering a query end-to-end — retrieving, refining, and verifying omni-modal evidence before producing a grounded answer.
 
 <p align="center">
-    <a href="https://github.com/mbzuai-oryx/LongShOT/blob/main/assets/longshot_agent_demo.mp4">
-        <img src="assets/longshot_agent_demo_poster.png" alt="Watch the LongShOTAgent walkthrough" width="80%">
-    </a>
+    <video src="https://github.com/user-attachments/assets/c6817e01-2ff2-44f1-a48a-cf174e4e41c2" poster="assets/longshot_agent_demo_poster.png" controls muted width="80%">
+        <a href="https://github.com/user-attachments/assets/c6817e01-2ff2-44f1-a48a-cf174e4e41c2">▶ Watch the LongShOTAgent walkthrough</a>
+    </video>
 </p>
-
-<p align="center"><em>▶ Click to play the walkthrough.</em></p>
 
 ## Responsible Usage
 
