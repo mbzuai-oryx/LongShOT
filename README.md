@@ -1,3 +1,5 @@
+<a href="https://visitorbadge.io/status?path=mbzuai-oryx%2FLongShOT"><img align="right" src="https://api.visitorbadge.io/api/visitors?path=mbzuai-oryx%2FLongShOT&label=Visitors&countColor=%23263759" alt="Visitors"></a>
+
 # LongShOT: A Benchmark for Omni-Modal Reasoning in Long Videos
 
 <p align="center">
