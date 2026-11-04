@@ -15,7 +15,7 @@
 [![Paper](https://img.shields.io/badge/arXiv-Paper-<COLOR>.svg)](https://arxiv.org/abs/2512.16978)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-Dataset-F9D371)](https://huggingface.co/datasets/MBZUAI/longshot-bench)
 [![Leaderboard](https://img.shields.io/badge/🏆-Leaderboard-FF6B6B)](https://longshot.cvmbzuai.com/leaderboard)
-[![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](https://github.com/mbzuai-oryx/BiMediX/blob/main/LICENSE.txt)
+[![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey)](LICENSE)
 
 ## Table of Contents
 
