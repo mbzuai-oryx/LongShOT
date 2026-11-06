@@ -1,6 +1,6 @@
 <a href="https://visitorbadge.io/status?path=mbzuai-oryx%2FLongShOT"><img align="right" src="https://api.visitorbadge.io/api/visitors?path=mbzuai-oryx%2FLongShOT&label=Visitors&countColor=%23263759" alt="Visitors"></a>
 
-# LongShOT: A Benchmark for Omni-Modal Reasoning in Long Videos
+# LongShOT: A Benchmark and Agentic Framework for Omni-Modal Reasoning in Long Videos
 
 <p align="center">
     <img src="https://i.imgur.com/waxVImv.png" alt="LongShOT">
@@ -207,7 +207,7 @@ If you find this work useful, please cite our paper:
 
 ```bibtex
 @misc{kurpath2026benchmarkomnimodalreasoninglong,
-      title={A Benchmark for Omni-Modal Reasoning in Long Videos}, 
+      title={A Benchmark and Agentic Framework for Omni-Modal Reasoning in Long Videos}, 
       author={Mohammed Irfan Kurpath and Jaseel Muhammad Kaithakkodan and Jinxing Zhou and Sahal Shaji Mullappilly and Mohammad Almansoori and Noor Ahsan and Beknur Kalmakhanbet and Sambal Shikhar and Rishabh Lalla and Jean Lahoud and Mariette Awad and Fahad Shahbaz Khan and Salman Khan and Rao Muhammad Anwer and Hisham Cholakkal},
       year={2026},
       eprint={2512.16978},

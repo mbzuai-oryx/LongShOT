@@ -34,7 +34,7 @@ scoring.py       # Score calculation and aggregation
    ```
 3. **Dataset Access**: The framework loads datasets from Hugging Face. Ensure you have:
    - Hugging Face authentication configured
-   - Access to the required datasets (anonymous/longshot-bench)
+   - Access to the required datasets (MBZUAI/longshot-bench, public)
 
 4. **Video Files**: Videos must be available at the path specified in configuration:
    ```yaml
@@ -96,9 +96,9 @@ system:
 
 ```yaml
 longshot_bench:
-  postvalid_v1:
-    path: anonymous/longshot-bench
-    name: postvalid_v1
+  postvalid_v2:
+    path: MBZUAI/longshot-bench
+    name: postvalid_v2
     split: test
 ```
 
@@ -142,7 +142,7 @@ If not using `--external-server` flag, the script will auto-manage servers. To m
 ```bash
 python eval.py \
     --model "Qwen/Qwen2.5-VL-7B-Instruct" \
-    --tasks postvalid_v1 \
+    --tasks postvalid_v2 \
     --num_workers 1 \
     --generate true \
     --output_dir results_postvalid \
@@ -169,7 +169,7 @@ python eval.py \
 python eval.py \
     --model "Qwen/Qwen2.5-VL-7B-Instruct" \
     --eval_model "Qwen/Qwen3-14B" \
-    --tasks postvalid_v1 \
+    --tasks postvalid_v2 \
     --num_workers 1024 \
     --evaluate true \
     --output_dir results_postvalid \
@@ -184,12 +184,14 @@ python eval.py \
 
 **Output**: Generates `{model_name}_eval.jsonl` with scored responses.
 
+**Paper results** use three judges: `Qwen/Qwen3-14B` and `google/gemma-4-31B-it` (run this step with each as `--eval_model`), and `gpt-5-mini-2025-08-07` (via `openai.sh`). The reported score is the mean of the three judges' overall scores.
+
 #### Step 4: Calculate Final Scores
 
 ```bash
 python eval.py \
     --model "Qwen/Qwen2.5-VL-7B-Instruct" \
-    --tasks postvalid_v1 \
+    --tasks postvalid_v2 \
     --score true \
     --output_dir results_postvalid \
     --config-file config.yaml

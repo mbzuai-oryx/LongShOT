@@ -1,5 +1,5 @@
 longshot_bench:
   postvalid_v2:
-    path: anonymous/longshot-bench
+    path: MBZUAI/longshot-bench
     name: postvalid_v2
     split: test
